@@ -8,7 +8,7 @@ pub struct ConsumerConfig {
 }
 
 impl ConsumerConfig {
-    fn new() -> ConsumerConfig {
+    pub fn new() -> ConsumerConfig {
         ConsumerConfig {
             properties: vec![]
         }

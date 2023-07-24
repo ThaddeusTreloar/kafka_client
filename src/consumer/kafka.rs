@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use super::{config::ConsumerConfig, internal::{SubscriberConsumer, AssignedConsumer, SubscriberConsumerTrait, AssignedConsumerTrait, UnallocatedConsumer, UnallocatedConsumerTrait}};
 
 
-struct KafkaConsumer<T> {
+pub struct KafkaConsumer<T> {
     consumption_strategy: PhantomData<T>
 }
 

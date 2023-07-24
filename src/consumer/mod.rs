@@ -1,3 +1,3 @@
-mod config;
-mod internal;
-mod kafka;
+pub mod config;
+pub mod internal;
+pub mod kafka;
