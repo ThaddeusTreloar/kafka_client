@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use futures::Stream;
 
 pub struct RecordSet<K, V> {
@@ -63,4 +65,10 @@ impl<K, V> Record<K, V> {
             b: value
         }
     }
+}
+
+pub struct Headers<'a, K, V> 
+where K: From<&'a [u8]>, V: From<&'a [u8]>
+{
+    headers: &'a Vec<(K, V)>
 }

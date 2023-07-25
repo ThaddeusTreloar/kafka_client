@@ -2,10 +2,17 @@
 
 pub enum Error {
     GenericError(String),
+    ConfigurationError(ConfigurationError),
     ConsumerError(ConsumerError),
     ProducerError(ProducerError),
     KafkaError(KafkaError),
     StateStoreError(StateStoreError)
+}
+
+impl From<ConfigurationError> for Error {
+    fn from(value: ConfigurationError) -> Self {
+        Error::ConfigurationError(value)
+    }
 }
 
 impl From<StateStoreError> for Error {
@@ -30,6 +37,12 @@ impl From<KafkaError> for Error {
     fn from(value: KafkaError) -> Self {
         Error::KafkaError(value)
     }
+}
+
+
+pub enum ConfigurationError {
+    MalformedOption(String),
+    MalformedOptions(Vec<String>)
 }
 
 pub enum StateStoreError {

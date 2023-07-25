@@ -1,4 +1,4 @@
-use crate::config::{KafkaProperty, raw_config::RawConfig};
+use crate::{config::{KafkaProperty, raw_config::RawConfig}, error::Error};
 
 pub struct ConsumerConfig {
     properties: Vec<ConsumerProperty>
@@ -12,9 +12,13 @@ impl ConsumerConfig {
     }
 }
 
-impl From<RawConfig> for ConsumerConfig {
-    fn from(value: RawConfig) -> Self {
-        ConsumerConfig { properties: vec![] }
+
+
+impl TryFrom<RawConfig> for ConsumerConfig {
+    type Error = Error;
+
+    fn try_from(value: RawConfig) -> Result<Self, Self::Error> {
+        unimplemented!()
     }
 }
 

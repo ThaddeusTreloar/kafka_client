@@ -7,6 +7,8 @@ mod config;
 mod admin;
 mod metadata;
 mod common;
+mod security;
+mod acl;
 #[cfg(feature="streams")]
 mod streams;
 #[cfg(feature="schema_registry")]
