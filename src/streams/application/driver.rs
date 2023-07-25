@@ -1,4 +1,3 @@
 use crate::streams::config::StreamsConfig;
 
-pub trait StreamDriver: TryFrom<StreamsConfig> {
-}
+pub trait StreamDriver: TryFrom<StreamsConfig> {}

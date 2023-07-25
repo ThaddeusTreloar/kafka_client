@@ -1,7 +1,13 @@
-use crate::{consumer::config::ConsumerProperty, error::{ProducerError, Error}, prelude::Result, config::{raw_config::RawConfig}, producer::config::ProducerProperty};
+use crate::{
+    config::raw_config::RawConfig,
+    consumer::config::ConsumerProperty,
+    error::{Error, ProducerError},
+    prelude::Result,
+    producer::config::ProducerProperty,
+};
 
 pub struct StreamsConfig {
-    properties: Vec<StreamsProperty>
+    properties: Vec<StreamsProperty>,
 }
 
 impl TryFrom<RawConfig> for StreamsConfig {
@@ -15,11 +21,11 @@ impl TryFrom<RawConfig> for StreamsConfig {
 pub enum StreamsProperty {
     ConsumerProperty(ConsumerProperty),
     ProducerProperty(ProducerProperty),
-    ApplicationId(ApplicationId)
+    ApplicationId(ApplicationId),
 }
 
 pub struct ApplicationId {
-    id: String
+    id: String,
 }
 
 impl TryFrom<String> for ApplicationId {

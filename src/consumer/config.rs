@@ -1,18 +1,17 @@
-use crate::{config::{KafkaProperty, raw_config::RawConfig}, error::Error};
+use crate::{
+    config::{raw_config::RawConfig, KafkaProperty},
+    error::Error,
+};
 
 pub struct ConsumerConfig {
-    properties: Vec<ConsumerProperty>
+    properties: Vec<ConsumerProperty>,
 }
 
 impl ConsumerConfig {
     pub fn new() -> ConsumerConfig {
-        ConsumerConfig {
-            properties: vec![]
-        }
+        ConsumerConfig { properties: vec![] }
     }
 }
-
-
 
 impl TryFrom<RawConfig> for ConsumerConfig {
     type Error = Error;
@@ -23,5 +22,5 @@ impl TryFrom<RawConfig> for ConsumerConfig {
 }
 
 pub enum ConsumerProperty {
-    KafkaProperty(KafkaProperty)
+    KafkaProperty(KafkaProperty),
 }

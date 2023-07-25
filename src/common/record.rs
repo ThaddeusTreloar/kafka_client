@@ -7,24 +7,27 @@ pub type Offset = i64;
 pub enum PartitionOffset {
     Beginning,
     End,
-    Offset(Offset)
+    Offset(Offset),
 }
 
 pub struct RecordSet<K, V> {
     a: K,
-    b: V
+    b: V,
 }
 
 pub struct RecordStream<K, V> {
     a: K,
-    b: V
+    b: V,
 }
 
-impl <K, V> Stream for RecordStream<K, V> {
+impl<K, V> Stream for RecordStream<K, V> {
     // TODO
     type Item = Record<K, V>;
 
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
         unimplemented!()
     }
 
@@ -35,15 +38,12 @@ impl <K, V> Stream for RecordStream<K, V> {
 
 pub struct Record<K, V> {
     a: K,
-    b: V
+    b: V,
 }
 
 impl<K, V> Record<K, V> {
     fn from_key_value(key: K, value: V) -> Record<K, V> {
-        Record { 
-            a: key,
-            b: value
-        }
+        Record { a: key, b: value }
     }
 
     fn with_partition(self, parition: Partition) -> Self {
@@ -58,25 +58,24 @@ impl<K, V> Record<K, V> {
         self
     }
 
-                                    // TODO: Bytes?
+    // TODO: Bytes?
     fn with_header(self, header_key: String, header_val: String) -> Self {
         self
     }
-                                    // TODO: Bytes?
+    // TODO: Bytes?
     fn with_headers(self, headers: Vec<(String, String)>) -> Self {
         self
     }
 
     fn from_value(key: K, value: V) -> Record<K, V> {
-        Record { 
-            a: key,
-            b: value
-        }
+        Record { a: key, b: value }
     }
 }
 
-pub struct Headers<'a, K, V> 
-where K: From<&'a [u8]>, V: From<&'a [u8]>
+pub struct Headers<'a, K, V>
+where
+    K: From<&'a [u8]>,
+    V: From<&'a [u8]>,
 {
-    headers: &'a Vec<(K, V)>
+    headers: &'a Vec<(K, V)>,
 }

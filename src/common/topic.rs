@@ -1,93 +1,91 @@
-use std::{collections::{HashSet, HashMap}, ops::Range};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+};
 
 use super::record::Offset;
 
 pub type Partition = i32;
 
 pub struct TopicPartitionOffsetMap {
-    map: HashMap<(String, Partition), Offset>
+    map: HashMap<(String, Partition), Offset>,
 }
 
 impl TopicPartitionOffsetMap {
     fn new() -> TopicPartitionOffsetMap {
         TopicPartitionOffsetMap {
-            map: HashMap::new()
+            map: HashMap::new(),
         }
     }
 }
 
 pub struct TopicPartitionList {
-    set: HashSet<TopicPartition>
+    set: HashSet<TopicPartition>,
 }
 
 impl TopicPartitionList {
     fn new() -> Self {
-        TopicPartitionList { set: HashSet::new() }
+        TopicPartitionList {
+            set: HashSet::new(),
+        }
     }
 
-    fn add_topic<'a>(&mut self, topic: impl Into<&'a str>) -> TopicPartitionList {
-        let s_ref: &str = topic.into();
-
-        let (mut retain, out): (HashSet<TopicPartition>, HashSet<TopicPartition>) = self.set
+    fn add_topic(&mut self, topic: &str) -> TopicPartitionList {
+        let (mut retain, out): (HashSet<TopicPartition>, HashSet<TopicPartition>) = self
+            .set
+            .clone()
             .into_iter()
-            .partition(
-                |tp| s_ref.eq(tp.topic.as_str())
-            );
+            .partition(|tp| topic.eq(tp.topic.as_str()));
 
-        retain.insert(s_ref.into());
+        retain.insert(topic.into());
 
         self.set = retain;
 
         out.into()
     }
 
-    fn add_partition<'a>(&mut self, topic: impl Into<&'a str>, partition: impl Into<Partition>) {
-        let t = topic.into();
-        let p = partition.into();
-        let tp = (t, p).into();
-
-        self.set.insert(tp);
+    fn add_partition(&mut self, topic: &str, partition: &Partition) {
+        self.set.insert((topic, partition).into());
     }
 
-    fn add_partition_range<'a>(&mut self, topic: impl Into<&'a str>, range: Range<Partition>) {
-        range.into_iter().for_each(|partition| self.add_partition(topic, partition));
+    fn add_partition_range(&mut self, topic: &str, range: Range<Partition>) {
+        range
+            .into_iter()
+            .for_each(|partition| self.add_partition(topic, &partition));
     }
 
     fn get_topic<'a>(&self, topic: impl Into<&'a str>) -> TopicPartitionList {
         let s_ref: &str = topic.into();
 
-        self.set.iter().filter(|tp|s_ref.eq(tp.topic.as_str())).map(|tp| tp.clone()).collect()
+        self.set
+            .iter()
+            .filter(|tp| s_ref.eq(tp.topic.as_str()))
+            .collect()
     }
 }
 
 impl FromIterator<TopicPartition> for TopicPartitionList {
     fn from_iter<T: IntoIterator<Item = TopicPartition>>(iter: T) -> Self {
-        iter.into_iter().map(
-            |item| item.clone()
-        ).collect()
+        iter.into_iter().collect()
     }
 }
 
-impl <'a> FromIterator<&'a TopicPartition> for TopicPartitionList {
+impl<'a> FromIterator<&'a TopicPartition> for TopicPartitionList {
     fn from_iter<T: IntoIterator<Item = &'a TopicPartition>>(iter: T) -> Self {
-        iter.into_iter().map(
-            |item| item.clone()
-        ).collect()
+        iter.into_iter().collect()
     }
 }
 
 impl From<TopicPartitionOffsetMap> for TopicPartitionList {
     fn from(value: TopicPartitionOffsetMap) -> Self {
         TopicPartitionList {
-            set: value.map.into_iter().map(
-                |(tp, o)| tp.into()
-            ).collect()
+            set: value.map.into_iter().map(|(tp, o)| tp.into()).collect(),
         }
     }
 }
 
-impl From<HashSet<TopicPartition>> for TopicPartitionList { 
+impl From<HashSet<TopicPartition>> for TopicPartitionList {
     fn from(value: HashSet<TopicPartition>) -> Self {
         TopicPartitionList { set: value }
     }
@@ -96,50 +94,49 @@ impl From<HashSet<TopicPartition>> for TopicPartitionList {
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct TopicPartition {
     topic: String,
-    partition: Option<Partition>
+    partition: Option<Partition>,
 }
 
 impl TopicPartition {
     fn new(topic: &str, partition: Partition) -> TopicPartition {
-        TopicPartition { 
-            topic: String::from(topic), 
-            partition: Some(partition)
+        TopicPartition {
+            topic: String::from(topic),
+            partition: Some(partition),
         }
     }
 }
 
-impl From<(&str, Partition)> for TopicPartition {
-    fn from(value: (&str, Partition)) -> Self {
-        TopicPartition { 
-            topic: String::from(value.0), 
-            partition: Some(value.1)
+impl From<(&str, &Partition)> for TopicPartition {
+    fn from(value: (&str, &Partition)) -> Self {
+        TopicPartition {
+            topic: String::from(value.0),
+            partition: Some(*value.1),
         }
     }
 }
 
 impl From<(String, Partition)> for TopicPartition {
     fn from(value: (String, Partition)) -> Self {
-        TopicPartition { 
+        TopicPartition {
             topic: value.0,
-            partition: Some(value.1)
+            partition: Some(value.1),
         }
     }
 }
 impl From<&str> for TopicPartition {
     fn from(value: &str) -> Self {
-        TopicPartition { 
-            topic: String::from(value), 
-            partition: None
+        TopicPartition {
+            topic: String::from(value),
+            partition: None,
         }
     }
 }
 
 impl From<String> for TopicPartition {
     fn from(value: String) -> Self {
-        TopicPartition { 
+        TopicPartition {
             topic: value,
-            partition: None
+            partition: None,
         }
     }
 }
-

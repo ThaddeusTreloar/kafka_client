@@ -1,20 +1,18 @@
-use self::{stream::Stream, table::Table, global_table::GlobalTable};
+use self::{global_table::GlobalTable, stream::Stream, table::Table};
 
+pub mod global_table;
 pub mod stream;
 pub mod table;
-pub mod global_table;
 
-pub struct Topology {
-
-}
+pub struct Topology {}
 
 impl Topology {
     fn new() -> Self {
-        Topology{}
+        Topology {}
     }
 
     fn stream(topic: String) -> Stream {
-        Stream {  }
+        Stream {}
     }
 
     fn table(topic: String) -> Table {

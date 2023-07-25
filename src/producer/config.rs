@@ -1,15 +1,12 @@
-use crate::config::{KafkaProperty, raw_config::RawConfig};
-
+use crate::config::{raw_config::RawConfig, KafkaProperty};
 
 pub struct ProducerConfig {
-    properties: Vec<ProducerProperty>
+    properties: Vec<ProducerProperty>,
 }
 
 impl ProducerConfig {
     pub fn new() -> ProducerConfig {
-        ProducerConfig {
-            properties: vec![]
-        }
+        ProducerConfig { properties: vec![] }
     }
 }
 
@@ -20,5 +17,5 @@ impl From<RawConfig> for ProducerConfig {
 }
 
 pub enum ProducerProperty {
-    KafkaProperty(KafkaProperty)
+    KafkaProperty(KafkaProperty),
 }

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::common::record::RecordStream;
 
-use super::{config::ConsumerConfig, common::{SubscriberConsumer, AssignedConsumer, SubscriberConsumerTrait, AssignedConsumerTrait, UnallocatedConsumer, UnallocatedConsumerTrait, Consumer, AsyncConsumer}};
+use super::{config::ConsumerConfig, common::{SubscriberConsumer, AssignedConsumer, SubscriberConsumerTrait, AssignedConsumerTrait, UnallocatedConsumer, UnallocatedConsumerTrait, SyncConsumer, AsyncConsumer}};
 
 
 pub struct KafkaConsumer<K, V, T>
@@ -73,7 +73,7 @@ impl<K, V> SubscriberConsumerTrait<K, V> for SubscriberKafkaConsumer<K, V> {
     }
 }
 
-impl<K, V> Consumer<K, V> for SubscriberKafkaConsumer<K, V> {
+impl<K, V> SyncConsumer<K, V> for SubscriberKafkaConsumer<K, V> {
     fn poll(&self) -> Vec<(K, V)> {
         vec![]
     }
@@ -90,7 +90,7 @@ impl<K, V> AssignedConsumerTrait<K, V> for AssignedKakfaConsumer<K, V> {
     }
 }
 
-impl<K, V> Consumer<K, V> for AssignedKakfaConsumer<K, V> {
+impl<K, V> SyncConsumer<K, V> for AssignedKakfaConsumer<K, V> {
     fn poll(&self) -> Vec<(K, V)> {
         vec![]
     }

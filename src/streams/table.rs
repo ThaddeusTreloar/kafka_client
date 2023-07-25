@@ -1,33 +1,52 @@
-use std::{collections::HashMap, sync::{RwLock, Arc}, marker::PhantomData, thread::{JoinHandle, sleep}, process::Output, time::Duration, hash::Hash};
-use futures::{StreamExt, stream::{ForEach, FilterMap}, Future, future::{join_all, join}, join};
-use tokio::{spawn};
+use futures::{
+    future::{join, join_all},
+    join,
+    stream::{FilterMap, ForEach},
+    Future, StreamExt,
+};
+use std::{
+    collections::HashMap,
+    hash::Hash,
+    marker::PhantomData,
+    process::Output,
+    sync::{Arc, RwLock},
+    thread::{sleep, JoinHandle},
+    time::Duration,
+};
+use tokio::spawn;
 
-use crate::{consumer::{common::AsyncConsumer, config::ConsumerConfig}, error::KafkaError, common::record::Record};
+use crate::{
+    common::record::Record,
+    consumer::{common::AsyncConsumer, config::ConsumerConfig},
+    error::KafkaError,
+};
 
 use super::store::{common::StateStore, in_memory::InMemoryStateStore};
-
 
 pub struct IdleStreamTable;
 pub struct InitialisedStreamTable;
 
 pub struct StreamTable<S, K, V>
-where 
+where
     K: From<Vec<u8>> + Into<Vec<u8>> + std::cmp::Eq + PartialEq + Hash,
-    V: From<Vec<u8>> + Into<Vec<u8>>
+    V: From<Vec<u8>> + Into<Vec<u8>>,
 {
     input_stream: Arc<dyn AsyncConsumer<K, V>>,
     state_store: Arc<dyn StateStore<K, V> + Send + Sync>,
     commit_store: Arc<dyn StateStore<K, V> + Send + Sync>,
     topic: String,
-    state: PhantomData<S>
+    state: PhantomData<S>,
 }
 
-impl <K, V> StreamTable<IdleStreamTable, K, V>
-where 
+impl<K, V> StreamTable<IdleStreamTable, K, V>
+where
     K: From<Vec<u8>> + Into<Vec<u8>> + std::cmp::Eq + PartialEq + Hash,
-    V: From<Vec<u8>> + Into<Vec<u8>> + Clone
+    V: From<Vec<u8>> + Into<Vec<u8>> + Clone,
 {
-    pub fn new(input: &ConsumerConfig, topic: &str) -> Result<StreamTable<IdleStreamTable, K, V>, KafkaError> {
+    pub fn new(
+        input: &ConsumerConfig,
+        topic: &str,
+    ) -> Result<StreamTable<IdleStreamTable, K, V>, KafkaError> {
         unimplemented!()
     }
 
@@ -35,9 +54,7 @@ where
         unimplemented!()
     }
 
-    pub fn start(self)
-    {
-    }
+    pub fn start(self) {}
 }
 
 fn process_table_message<K, V>(store: Arc<RwLock<HashMap<String, String>>>, message: Record<K, V>) {
@@ -45,7 +62,7 @@ fn process_table_message<K, V>(store: Arc<RwLock<HashMap<String, String>>>, mess
 }
 /*
 async fn start_table<K, V>(table: Arc<StreamTable<InitialisedStreamTable, K, V>>) -> Result<()>
-where 
+where
     K: From<Vec<u8>> + Into<Vec<u8>> + std::cmp::Eq + PartialEq + Hash,
     V: From<Vec<u8>> + Into<Vec<u8>>
 {
@@ -63,13 +80,13 @@ where
 
             return async move {
                 let msg = message.detach();
-        
+
                 state_store_ref.put(
-                    msg.key().unwrap().to_vec().into(), 
+                    msg.key().unwrap().to_vec().into(),
                     msg.payload().unwrap().to_vec().into()
                 );
 
-                
+
             }
         }
     ).await;

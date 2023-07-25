@@ -1,62 +1,54 @@
-
-
 pub enum Error {
-    GenericError(String),
-    ConfigurationError(ConfigurationError),
-    ConsumerError(ConsumerError),
-    ProducerError(ProducerError),
-    KafkaError(KafkaError),
-    StateStoreError(StateStoreError)
+    Generic(String),
+    Configuration(ConfigurationError),
+    Consumer(ConsumerError),
+    Producer(ProducerError),
+    Kafka(KafkaError),
+    StateStore(StateStoreError),
 }
 
 impl From<ConfigurationError> for Error {
     fn from(value: ConfigurationError) -> Self {
-        Error::ConfigurationError(value)
+        Error::Configuration(value)
     }
 }
 
 impl From<StateStoreError> for Error {
     fn from(value: StateStoreError) -> Self {
-        Error::StateStoreError(value)
+        Error::StateStore(value)
     }
 }
 
 impl From<ConsumerError> for Error {
     fn from(value: ConsumerError) -> Self {
-        Error::ConsumerError(value)
+        Error::Consumer(value)
     }
 }
 
 impl From<ProducerError> for Error {
     fn from(value: ProducerError) -> Self {
-        Error::ProducerError(value)
+        Error::Producer(value)
     }
 }
 
 impl From<KafkaError> for Error {
     fn from(value: KafkaError) -> Self {
-        Error::KafkaError(value)
+        Error::Kafka(value)
     }
 }
 
-
 pub enum ConfigurationError {
     MalformedOption(String),
-    MalformedOptions(Vec<String>)
+    MalformedOptions(Vec<String>),
 }
 
 pub enum StateStoreError {
-    StateStoreFailed(String)
+    StateStoreFailed(String),
 }
 
+pub enum ConsumerError {}
 
-pub enum ConsumerError {
-
-}
-
-pub enum ProducerError {
-    
-}
+pub enum ProducerError {}
 
 pub enum KafkaError {
     ProducerError(ProducerError),

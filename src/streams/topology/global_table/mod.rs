@@ -1,2 +1,1 @@
-
-pub struct GlobalTable{} 
+pub struct GlobalTable {}
