@@ -1,47 +1,28 @@
 use async_trait::async_trait;
-use futures::{Stream, StreamExt};
 
-use crate::internal::KafkaMessage;
-
-
+use crate::common::record::RecordStream;
 
 pub struct UnallocatedConsumer;
 pub struct SubscriberConsumer;
 pub struct AssignedConsumer;
 
-pub trait UnallocatedConsumerTrait {
-    fn subscribe(self) -> Box<dyn SubscriberConsumerTrait>;
-    fn assign(self) -> Box<dyn AssignedConsumerTrait>;
+pub trait UnallocatedConsumerTrait<K, V> {
+    fn subscribe(self) -> Box<dyn SubscriberConsumerTrait<K, V>>;
+    fn assign(self) -> Box<dyn AssignedConsumerTrait<K, V>>;
 }
-pub trait SubscriberConsumerTrait: Consumer {
+pub trait SubscriberConsumerTrait<K, V>: Consumer<K, V> {
     fn subscribe(&mut self);
 }
-pub trait AssignedConsumerTrait: Consumer {
+pub trait AssignedConsumerTrait<K, V>: Consumer<K, V> {
     fn assign(&mut self);
 }
 
-#[cfg(feature = "async_components")]
-#[async_trait]
-pub trait AsyncConsumer {
-    async fn poll_async(&self) -> dyn Iterator<Item = bool>;
+#[cfg(feature = "async_client")]
+#[async_trait(?Send)]
+pub trait AsyncConsumer<K, V> {
+    async fn poll_async(&self) -> RecordStream<K, V>;
 }
 
-pub trait Consumer {
-    fn poll(&self);
-}
-
-pub struct MessageStream {
-
-}
-
-impl Stream for MessageStream {
-    type Item = KafkaMessage;
-
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
-        unimplemented!()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        unimplemented!()
-    }
+pub trait Consumer<K, V> {
+    fn poll(&self) -> Vec<(K, V)>;
 }

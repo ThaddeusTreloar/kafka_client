@@ -1,3 +1,3 @@
 use crate::error::Error;
 
-//type Result<T> = Result<T, Error>;
+pub type Result<T> = core::result::Result<T, Error>;
