@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
-use super::{config::ConsumerConfig, internal::{SubscriberConsumer, AssignedConsumer, SubscriberConsumerTrait, AssignedConsumerTrait, UnallocatedConsumer, UnallocatedConsumerTrait}};
+use async_trait::async_trait;
+
+use super::{config::ConsumerConfig, internal::{SubscriberConsumer, AssignedConsumer, SubscriberConsumerTrait, AssignedConsumerTrait, UnallocatedConsumer, UnallocatedConsumerTrait, Consumer, AsyncConsumer}};
 
 
 pub struct KafkaConsumer<T> {
@@ -56,6 +58,12 @@ impl SubscriberConsumerTrait for SubscriberKafkaConsumer {
     }
 }
 
+impl Consumer for SubscriberKafkaConsumer {
+    fn poll(&self) {
+        
+    }
+}
+
 impl AssignedKakfaConsumer {
     
 }
@@ -64,6 +72,20 @@ impl AssignedKakfaConsumer {
 impl AssignedConsumerTrait for AssignedKakfaConsumer {
     fn assign(&mut self) {
         
+    }
+}
+
+impl Consumer for AssignedKakfaConsumer {
+    fn poll(&self) {
+        
+    }
+}
+
+#[cfg(feature = "async_components")]
+#[async_trait]
+impl AsyncConsumer for AssignedKakfaConsumer {
+    async fn poll_async(&self) -> dyn Iterator<Item = bool> {
+        unimplemented!()
     }
 }
 
