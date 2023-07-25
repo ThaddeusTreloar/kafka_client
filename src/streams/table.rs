@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::{RwLock, Arc}, marker::PhantomData, thread
 use futures::{StreamExt, stream::{ForEach, FilterMap}, Future, future::{join_all, join}, join};
 use tokio::{spawn};
 
-use crate::{consumer::{internal::AsyncConsumer, config::ConsumerConfig}, error::KafkaError, common::record::Record};
+use crate::{consumer::{common::AsyncConsumer, config::ConsumerConfig}, error::KafkaError, common::record::Record};
 
 use super::store::{common::StateStore, in_memory::InMemoryStateStore};
 

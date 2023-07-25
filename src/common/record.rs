@@ -1,6 +1,14 @@
-use std::marker::PhantomData;
-
 use futures::Stream;
+
+use super::topic::Partition;
+
+pub type Offset = i64;
+
+pub enum PartitionOffset {
+    Beginning,
+    End,
+    Offset(Offset)
+}
 
 pub struct RecordSet<K, V> {
     a: K,
@@ -38,7 +46,7 @@ impl<K, V> Record<K, V> {
         }
     }
 
-    fn with_partition(self, parition: usize) -> Self {
+    fn with_partition(self, parition: Partition) -> Self {
         self
     }
 
@@ -46,7 +54,7 @@ impl<K, V> Record<K, V> {
         self
     }
 
-    fn with_topic_partition(self, topic: String, partition: usize) -> Self {
+    fn with_topic_partition(self, topic: String, partition: Partition) -> Self {
         self
     }
 

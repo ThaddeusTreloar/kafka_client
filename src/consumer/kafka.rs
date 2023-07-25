@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::common::record::RecordStream;
 
-use super::{config::ConsumerConfig, internal::{SubscriberConsumer, AssignedConsumer, SubscriberConsumerTrait, AssignedConsumerTrait, UnallocatedConsumer, UnallocatedConsumerTrait, Consumer, AsyncConsumer}};
+use super::{config::ConsumerConfig, common::{SubscriberConsumer, AssignedConsumer, SubscriberConsumerTrait, AssignedConsumerTrait, UnallocatedConsumer, UnallocatedConsumerTrait, Consumer, AsyncConsumer}};
 
 
 pub struct KafkaConsumer<K, V, T>
