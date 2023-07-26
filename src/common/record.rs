@@ -3,8 +3,9 @@ use futures::Stream;
 use super::topic::Partition;
 
 pub type Offset = i64;
+pub type RecordMetadata = ();
 
-pub enum PartitionOffset {
+pub enum Position {
     Beginning,
     End,
     Offset(Offset),

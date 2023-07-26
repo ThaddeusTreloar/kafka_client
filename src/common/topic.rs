@@ -1,38 +1,61 @@
+use chrono::NaiveTime;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     ops::Range,
 };
 
-use super::record::Offset;
+use super::record::{Offset, RecordMetadata};
 
 pub type Partition = i32;
+pub type MaybePartition = Option<Partition>;
 
-pub struct TopicPartitionOffsetMap {
-    map: HashMap<(String, Partition), Offset>,
+pub enum Metadata {
+    Offset(Offset),
+    OffsetAbstract((Offset, RecordMetadata)),
+    Timestamp(NaiveTime),
+    Abstract(RecordMetadata),
 }
 
-impl TopicPartitionOffsetMap {
-    fn new() -> TopicPartitionOffsetMap {
-        TopicPartitionOffsetMap {
+pub struct TopicPartitionMetadataMap<T> {
+    map: HashMap<TopicPartition<Partition>, T>,
+}
+
+impl From<(TopicPartition<Partition>, (Offset, RecordMetadata))>
+    for TopicPartitionMetadataMap<(Offset, RecordMetadata)>
+{
+    fn from(value: (TopicPartition<Partition>, (Offset, RecordMetadata))) -> Self {
+        let mut map = HashMap::new();
+        map.insert(value.0, value.1);
+
+        TopicPartitionMetadataMap { map }
+    }
+}
+
+impl TopicPartitionMetadataMap<Offset> {
+    fn new() -> TopicPartitionMetadataMap<Offset> {
+        TopicPartitionMetadataMap {
             map: HashMap::new(),
         }
     }
 }
 
-pub struct TopicPartitionList {
-    set: HashSet<TopicPartition>,
+pub struct TopicPartitionList<T> {
+    set: HashSet<TopicPartition<T>>,
 }
 
-impl TopicPartitionList {
+impl TopicPartitionList<MaybePartition> {
     fn new() -> Self {
         TopicPartitionList {
             set: HashSet::new(),
         }
     }
 
-    fn add_topic(&mut self, topic: &str) -> TopicPartitionList {
-        let (mut retain, out): (HashSet<TopicPartition>, HashSet<TopicPartition>) = self
+    fn add_topic(&mut self, topic: &str) -> TopicPartitionList<MaybePartition> {
+        let (mut retain, out): (
+            HashSet<TopicPartition<MaybePartition>>,
+            HashSet<TopicPartition<MaybePartition>>,
+        ) = self
             .set
             .clone()
             .into_iter()
@@ -55,7 +78,7 @@ impl TopicPartitionList {
             .for_each(|partition| self.add_partition(topic, &partition));
     }
 
-    fn get_topic<'a>(&self, topic: impl Into<&'a str>) -> TopicPartitionList {
+    fn get_topic<'a>(&self, topic: impl Into<&'a str>) -> TopicPartitionList<MaybePartition> {
         let s_ref: &str = topic.into();
 
         self.set
@@ -65,48 +88,83 @@ impl TopicPartitionList {
     }
 }
 
-impl FromIterator<TopicPartition> for TopicPartitionList {
-    fn from_iter<T: IntoIterator<Item = TopicPartition>>(iter: T) -> Self {
+impl FromIterator<TopicPartition<MaybePartition>> for TopicPartitionList<MaybePartition> {
+    fn from_iter<T: IntoIterator<Item = TopicPartition<MaybePartition>>>(iter: T) -> Self {
         iter.into_iter().collect()
     }
 }
 
-impl<'a> FromIterator<&'a TopicPartition> for TopicPartitionList {
-    fn from_iter<T: IntoIterator<Item = &'a TopicPartition>>(iter: T) -> Self {
+impl<'a> FromIterator<&'a TopicPartition<MaybePartition>> for TopicPartitionList<MaybePartition> {
+    fn from_iter<T: IntoIterator<Item = &'a TopicPartition<MaybePartition>>>(iter: T) -> Self {
         iter.into_iter().collect()
     }
 }
 
-impl From<TopicPartitionOffsetMap> for TopicPartitionList {
-    fn from(value: TopicPartitionOffsetMap) -> Self {
+impl<T> From<TopicPartitionMetadataMap<T>> for TopicPartitionList<Partition> {
+    fn from(value: TopicPartitionMetadataMap<T>) -> Self {
         TopicPartitionList {
             set: value.map.into_iter().map(|(tp, o)| tp.into()).collect(),
         }
     }
 }
 
-impl From<HashSet<TopicPartition>> for TopicPartitionList {
-    fn from(value: HashSet<TopicPartition>) -> Self {
+impl From<HashSet<TopicPartition<MaybePartition>>> for TopicPartitionList<MaybePartition> {
+    fn from(value: HashSet<TopicPartition<MaybePartition>>) -> Self {
         TopicPartitionList { set: value }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
-pub struct TopicPartition {
-    topic: String,
-    partition: Option<Partition>,
+impl From<TopicPartition<MaybePartition>> for TopicPartitionList<MaybePartition> {
+    fn from(value: TopicPartition<MaybePartition>) -> Self {
+        let mut set = HashSet::new();
+        set.insert(value);
+        TopicPartitionList { set }
+    }
 }
 
-impl TopicPartition {
-    fn new(topic: &str, partition: Partition) -> TopicPartition {
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct TopicPartition<T> {
+    topic: String,
+    partition: T,
+}
+
+impl TopicPartition<Partition> {
+    fn new(topic: &str, partition: Partition) -> TopicPartition<Partition> {
         TopicPartition {
             topic: String::from(topic),
-            partition: Some(partition),
+            partition,
         }
     }
 }
 
-impl From<(&str, &Partition)> for TopicPartition {
+impl TopicPartition<MaybePartition> {
+    fn new(topic: &str, partition: Option<Partition>) -> TopicPartition<MaybePartition> {
+        TopicPartition {
+            topic: String::from(topic),
+            partition,
+        }
+    }
+}
+
+impl From<(&str, &Partition)> for TopicPartition<Partition> {
+    fn from(value: (&str, &Partition)) -> Self {
+        TopicPartition {
+            topic: String::from(value.0),
+            partition: *value.1,
+        }
+    }
+}
+
+impl From<(String, Partition)> for TopicPartition<Partition> {
+    fn from(value: (String, Partition)) -> Self {
+        TopicPartition {
+            topic: value.0,
+            partition: value.1,
+        }
+    }
+}
+
+impl From<(&str, &Partition)> for TopicPartition<MaybePartition> {
     fn from(value: (&str, &Partition)) -> Self {
         TopicPartition {
             topic: String::from(value.0),
@@ -115,7 +173,7 @@ impl From<(&str, &Partition)> for TopicPartition {
     }
 }
 
-impl From<(String, Partition)> for TopicPartition {
+impl From<(String, Partition)> for TopicPartition<MaybePartition> {
     fn from(value: (String, Partition)) -> Self {
         TopicPartition {
             topic: value.0,
@@ -123,7 +181,8 @@ impl From<(String, Partition)> for TopicPartition {
         }
     }
 }
-impl From<&str> for TopicPartition {
+
+impl From<&str> for TopicPartition<MaybePartition> {
     fn from(value: &str) -> Self {
         TopicPartition {
             topic: String::from(value),
@@ -132,7 +191,7 @@ impl From<&str> for TopicPartition {
     }
 }
 
-impl From<String> for TopicPartition {
+impl From<String> for TopicPartition<MaybePartition> {
     fn from(value: String) -> Self {
         TopicPartition {
             topic: value,

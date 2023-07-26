@@ -17,6 +17,7 @@ full = ["async_client", "streams"]
 
 [dependencies]
 async-trait = "0.1.72"
+chrono = "0.4.26"
 futures = "0.3.28"
 serde = { version="1.0.175", features=["derive"]}
 thiserror = "1.0.44"

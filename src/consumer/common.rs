@@ -1,14 +1,24 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+    time::{Duration, Instant},
+};
 
 use async_trait::async_trait;
+use chrono::NaiveTime;
 
 use crate::{
     common::{
-        record::{Offset, PartitionOffset, RecordStream},
-        topic::{Partition, TopicPartition, TopicPartitionList, TopicPartitionOffsetMap},
+        record::{Offset, Position, RecordMetadata, RecordStream},
+        topic::{
+            MaybePartition, Partition, TopicPartition, TopicPartitionList,
+            TopicPartitionMetadataMap,
+        },
     },
     error::ConsumerError,
 };
+
+pub struct ConsumerGroupMetadata {}
 
 pub struct UnallocatedConsumer;
 pub struct SubscriberConsumer;
@@ -27,8 +37,11 @@ pub trait SubscriberConsumerTrait<K, V>: SyncConsumer<K, V> {
     //fn subscribe_to_pattern(Pattern pattern);
 }
 pub trait AssignedConsumerTrait<K, V>: SyncConsumer<K, V> {
-    fn assign(&mut self, assignments: TopicPartitionList);
-    fn assignment(&self) -> TopicPartitionList;
+    fn assign(
+        &mut self,
+        assignments: TopicPartitionList<MaybePartition>,
+    ) -> TopicPartitionList<Partition>;
+    fn assignment(&self) -> TopicPartitionList<Partition>;
 }
 
 #[cfg(feature = "async_client")]
@@ -38,78 +51,151 @@ pub trait AsyncConsumer<K, V>: Drop {
     async fn commit(
         &self,
         commit: ConsumerCommit,
-    ) -> Result<TopicPartitionOffsetMap, ConsumerError>;
+        timeout: Option<Duration>,
+    ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
     async fn set_callback(&mut self, callback: ()); // callback type
+    async fn wakeup(&self);
     async fn close(self, timeout: Duration);
-    async fn seek(&self, seek: ConsumerSeek) -> Result<Offset, ConsumerError>;
+    // Find our whether seek or seek_obj is ore ergonomic
+    async fn seek(
+        &self,
+        topic_partition: TopicPartition<MaybePartition>,
+        offset: Position,
+        metadata: Option<RecordMetadata>,
+    ) -> Result<Offset, ConsumerError>;
+    async fn seek_map(
+        &self,
+        map: TopicPartitionMetadataMap<Offset>,
+    ) -> Result<Offset, ConsumerError>; // Is this type unweildy or complicated?
+    async fn seek_obj(&self, seek: ConsumerSeek) -> Result<Offset, ConsumerError>;
+    async fn position(
+        &self,
+        partition: TopicPartitionList<MaybePartition>,
+        timeout: Option<Duration>,
+    ) -> Result<Offset, ConsumerError>;
+    async fn committed(
+        &self,
+        partition: TopicPartitionList<MaybePartition>,
+        timeout: Option<Duration>,
+    ) -> Result<(Offset, RecordMetadata), ConsumerError>;
+    async fn partitions(
+        &self,
+        partition: HashSet<String>,
+        timeout: Option<Duration>,
+    ) -> Result<TopicPartitionList<Partition>, ConsumerError>;
+    async fn topics(&self, timeout: Option<Duration>) -> HashSet<String>;
+    async fn beginning(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+        timeout: Option<Duration>,
+    ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
+    async fn end(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+        timeout: Option<Duration>,
+    ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
+    async fn metric(&self) -> HashSet<(), ()>; // determine type
+    async fn pause(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+    ) -> Result<(), ConsumerError>;
+    async fn paused(&self) -> TopicPartitionList<MaybePartition>;
+    async fn resume(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+    ) -> TopicPartitionList<Partition>;
+    async fn offset_at_timestamp(
+        &self,
+        partition_times: TopicPartitionMetadataMap<NaiveTime>,
+        timeout: Duration,
+    ) -> TopicPartitionMetadataMap<(Offset, NaiveTime)>;
+    async fn current_lag(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+    ) -> HashMap<TopicPartition<Partition>, Duration>;
+    async fn group_metadata(&self) -> Result<ConsumerGroupMetadata, ConsumerError>;
+    async fn enforce_rebalance(&self, reason: Option<&str>);
 }
 
 pub trait SyncConsumer<K, V>: Drop {
     fn poll(&self) -> Result<RecordStream<K, V>, ConsumerError>;
-    fn commit(&self, commit: ConsumerCommit) -> Result<TopicPartitionOffsetMap, ConsumerError>;
+    fn commit(
+        &self,
+        commit: ConsumerCommit,
+        timeout: Option<Duration>,
+    ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
     fn set_callback(&mut self, callback: ()); // callback type
     fn close(self, timeout: Duration);
     fn wakeup(&self);
-    fn seek(&self, seek: ConsumerSeek) -> Result<Offset, ConsumerError>;
+    fn seek(
+        &self,
+        topic_partition: TopicPartition<MaybePartition>,
+        offset: Position,
+        metadata: Option<RecordMetadata>,
+    ) -> Result<Offset, ConsumerError>;
+    fn seek_map(&self, map: TopicPartitionMetadataMap<Offset>) -> Result<Offset, ConsumerError>; // Is this type unweildy or complicated?
+    fn seek_obj(&self, seek: ConsumerSeek) -> Result<Offset, ConsumerError>;
+    fn position(
+        &self,
+        partition: TopicPartitionList<MaybePartition>,
+        timeout: Option<Duration>,
+    ) -> Result<Offset, ConsumerError>;
+    fn committed(
+        &self,
+        partition: TopicPartitionList<MaybePartition>,
+        timeout: Option<Duration>,
+    ) -> Result<(Offset, RecordMetadata), ConsumerError>;
+    fn partitions(
+        &self,
+        partition: HashSet<String>,
+        timeout: Option<Duration>,
+    ) -> Result<TopicPartitionList<Partition>, ConsumerError>;
+    fn topics(&self, timeout: Option<Duration>) -> HashSet<String>;
+    fn beginning(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+        timeout: Option<Duration>,
+    ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
+    fn end(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+        timeout: Option<Duration>,
+    ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
+    fn metric(&self) -> HashSet<(), ()>; // determine type
+    fn pause(&self, partitions: TopicPartitionList<MaybePartition>) -> Result<(), ConsumerError>;
+    fn paused(&self) -> TopicPartitionList<MaybePartition>;
+    fn resume(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+    ) -> TopicPartitionList<Partition>;
+    fn offset_at_timestamp(
+        &self,
+        partition_times: TopicPartitionMetadataMap<NaiveTime>,
+        timeout: Duration,
+    ) -> TopicPartitionMetadataMap<(Offset, NaiveTime)>;
+    fn current_lag(
+        &self,
+        partitions: TopicPartitionList<MaybePartition>,
+    ) -> HashMap<TopicPartition<Partition>, Duration>;
+    fn group_metadata(&self) -> Result<ConsumerGroupMetadata, ConsumerError>;
+    fn enforce_rebalance(&self, reason: Option<&str>);
 }
 
-pub enum CommitBounds {
+pub enum ConsumerCommit {
     All,
     Topics(HashSet<String>),
-    Partitions(TopicPartitionList),
-    Offsets(TopicPartitionOffsetMap),
-}
-
-pub struct ConsumerCommit {
-    timeout: Option<Duration>,
-    bounds: CommitBounds,
-}
-
-impl ConsumerCommit {
-    fn new() -> ConsumerCommit {
-        ConsumerCommit {
-            timeout: None,
-            bounds: CommitBounds::All,
-        }
-    }
-
-    fn with_timeout(self, timeout: Duration) -> Self {
-        ConsumerCommit {
-            timeout: Some(timeout),
-            bounds: self.bounds,
-        }
-    }
-
-    fn with_topics(self, bounds: HashSet<String>) -> Self {
-        ConsumerCommit {
-            timeout: self.timeout,
-            bounds: CommitBounds::Topics(bounds),
-        }
-    }
-
-    fn with_partitions(self, bounds: TopicPartitionList) -> Self {
-        ConsumerCommit {
-            timeout: self.timeout,
-            bounds: CommitBounds::Partitions(bounds),
-        }
-    }
-
-    fn with_offsets(self, bounds: TopicPartitionOffsetMap) -> Self {
-        ConsumerCommit {
-            timeout: self.timeout,
-            bounds: CommitBounds::Offsets(bounds),
-        }
-    }
+    Partitions(TopicPartitionList<MaybePartition>),
+    Offsets(TopicPartitionMetadataMap<Offset>),
 }
 
 pub struct ConsumerSeek {
-    topic_partition: TopicPartition,
-    offset: PartitionOffset,
+    topic_partition: TopicPartition<MaybePartition>,
+    offset: Position,
     metadata: Option<()>, // TODO: Figure out type
 }
 
 impl ConsumerSeek {
-    fn new(topic_partition: TopicPartition, offset: PartitionOffset) -> Self {
+    fn new(topic_partition: TopicPartition<MaybePartition>, offset: Position) -> Self {
         ConsumerSeek {
             topic_partition,
             offset,
@@ -125,77 +211,3 @@ impl ConsumerSeek {
         }
     }
 }
-
-/*
-
-long position(TopicPartition partition);
-
-
-long position(TopicPartition partition, final Duration timeout);
-
-OffsetAndMetadata committed(TopicPartition partition);
-
-
-OffsetAndMetadata committed(TopicPartition partition, final Duration timeout);
-
-
-Map<TopicPartition, OffsetAndMetadata> committed(Set<TopicPartition> partitions);
-
-
-Map<TopicPartition, OffsetAndMetadata> committed(Set<TopicPartition> partitions, final Duration timeout);
-
-
-Map<MetricName, ? extends Metric> metrics();
-
-
-List<PartitionInfo> partitionsFor(String topic);
-
-
-List<PartitionInfo> partitionsFor(String topic, Duration timeout);
-
-
-Map<String, List<PartitionInfo>> listTopics();
-
-
-Map<String, List<PartitionInfo>> listTopics(Duration timeout);
-
-
-Set<TopicPartition> paused();
-
-
-void pause(Collection<TopicPartition> partitions);
-
-
-void resume(Collection<TopicPartition> partitions);
-
-
-Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes(Map<TopicPartition, Long> timestampsToSearch);
-
-
-Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes(Map<TopicPartition, Long> timestampsToSearch, Duration timeout);
-
-
-Map<TopicPartition, Long> beginningOffsets(Collection<TopicPartition> partitions);
-
-
-Map<TopicPartition, Long> beginningOffsets(Collection<TopicPartition> partitions, Duration timeout);
-
-
-Map<TopicPartition, Long> endOffsets(Collection<TopicPartition> partitions);
-
-
-Map<TopicPartition, Long> endOffsets(Collection<TopicPartition> partitions, Duration timeout);
-
-
-OptionalLong currentLag(TopicPartition topicPartition);
-
-
-ConsumerGroupMetadata groupMetadata();
-
-
-void enforceRebalance();
-
-
-void enforceRebalance(final String reason);
-
-*/
