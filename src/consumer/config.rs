@@ -1,5 +1,5 @@
 use crate::{
-    config::{raw_config::RawConfig, KafkaProperty},
+    config::{raw_config::RawConfig, ClientPropertyValue},
     error::Error,
 };
 
@@ -22,7 +22,7 @@ impl TryFrom<RawConfig> for ConsumerConfig {
 }
 
 pub enum ConsumerProperty {
-    KafkaProperty(KafkaProperty),
+    Client(ClientPropertyValue),
 }
 
 /*
