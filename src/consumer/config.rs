@@ -1,5 +1,5 @@
 use crate::{
-    config::{raw_config::RawConfig, ClientPropertyValue},
+    config::{raw_config::RawConfig, ClientProperty},
     error::Error,
 };
 
@@ -22,7 +22,7 @@ impl TryFrom<RawConfig> for ConsumerConfig {
 }
 
 pub enum ConsumerProperty {
-    Client(ClientPropertyValue),
+    Client(ClientProperty),
 }
 
 /*

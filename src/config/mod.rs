@@ -6,21 +6,22 @@ use self::raw_config::RawConfig;
 pub mod raw_config;
 
 pub enum ClientPropertyKey {
-    BootstrapServers,
-    ReconnectBackoffConfig,
-    ReconnectBackoffMaxConfig,
+    BootstrapServersKey,
+    ReconnectBackoffConfigKey,
+    ReconnectBackoffMaxConfigKey,
 }
 
-pub enum ClientPropertyValue {
+pub enum ClientProperty {
     BootstrapServers(Vec<SocketAddr>),
     ReconnectBackoffConfig(Duration),
     ReconnectBackoffMaxConfig(Duration),
+    None
 }
 
-pub trait ClientConfig<T> {
-    fn get(&self, prop: ClientPropertyKey) -> Option<&ClientPropertyValue>;
-    fn push(&mut self, prop: ClientPropertyValue) -> Option<ClientPropertyValue>;
-    fn pop(&mut self, prop: ClientPropertyKey) -> Option<ClientPropertyValue>;
+pub trait ClientConfig {
+    fn get(&self, prop: ClientPropertyKey) -> &ClientProperty;
+    fn push(&mut self, prop: ClientProperty) -> ClientProperty;
+    fn pop(&mut self, prop: ClientPropertyKey) -> ClientProperty;
     fn contains(&self, prop: ClientPropertyKey) -> bool;
     fn new() -> Self;
 }
@@ -182,30 +183,48 @@ const DEFAULT_API_TIMEOUT_MS_DOC: &str = "Specifies the timeout (in milliseconds
 /**
  * Postprocess the configuration so that exponential backoff is disabled when reconnect backoff
  * is explicitly configured but the maximum reconnect backoff is not explicitly configured.
- * 
- * TODO: Rewrite so that this matches the original function sig:
- *       Map<String, Object> (AbstractConfig config, Map<String, Object> parsedValues)
- * 
- * Except with the updated config style, such as:
- *       fn<T>(config: dyn ClientConfig<T>) -> dyn ClientConfig<T>
- * 
- * Although now that I write the signature in rust it doesn't make much sense... 
- *
  */
-pub fn post_process_reconnect_backoff_configs<T>(config: &mut impl ClientConfig<T>) {
-    match (
-        config.get(ClientPropertyKey::ReconnectBackoffConfig),
-        config.get(ClientPropertyKey::ReconnectBackoffMaxConfig)
-    ) {
-        (Some(ClientPropertyValue::ReconnectBackoffConfig(base)), None
-        ) => config.push(
-            ClientPropertyValue::ReconnectBackoffMaxConfig(*base)
-        ),
-        (_, _) => None
+pub fn post_process_reconnect_backoff_config_inplace<T>(config: &mut T) 
+where T: ClientConfig
+{
+    use ClientPropertyKey::*;
+    use ClientProperty::*;
+
+    if config.contains(ReconnectBackoffConfigKey)
+    && !config.contains(ReconnectBackoffMaxConfigKey)
+    {
+        if let ReconnectBackoffConfig(base) = config.get(
+            ReconnectBackoffConfigKey
+        ) {
+            config.push(
+                ReconnectBackoffMaxConfig(*base)
+            );
+        }
     };
 }
 
+pub fn post_process_reconnect_backoff_configs<T>(config: & T) -> T
+where T: ClientConfig + Clone
+{
+    use ClientPropertyKey::*;
+    use ClientProperty::*;
 
+    let mut new_config: T = config.clone();
+
+    if config.contains(ReconnectBackoffConfigKey)
+    && !config.contains(ReconnectBackoffMaxConfigKey)
+    {
+        if let ReconnectBackoffConfig(base) = config.get(
+            ReconnectBackoffConfigKey
+        ) {
+            new_config.push(
+                ReconnectBackoffMaxConfig(*base)
+            );
+        }
+    };
+
+    new_config
+}
 
     /*public static Map<String, Object> post_process_reconnect_backoff_configs(AbstractConfig config,
                                                     Map<String, Object> parsedValues) {
