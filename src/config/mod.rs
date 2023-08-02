@@ -4,6 +4,7 @@ use std::{net::SocketAddr, time::Duration};
 use self::raw_config::RawConfig;
 
 pub mod raw_config;
+pub mod auth;
 
 pub enum ClientPropertyKey {
     BootstrapServersKey,
