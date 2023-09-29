@@ -1,10 +1,12 @@
 use std::{net::SocketAddr, time::Duration};
+use serde::Serialize;
 
+use crate::error::ConfigurationError;
 
 use self::raw_config::RawConfig;
 
-pub mod raw_config;
 pub mod auth;
+pub mod raw_config;
 
 pub enum ClientPropertyKey {
     BootstrapServersKey,
@@ -12,11 +14,206 @@ pub enum ClientPropertyKey {
     ReconnectBackoffMaxConfigKey,
 }
 
+#[derive(Debug, Serialize)]
+pub enum ClientDnsLookup {
+    UseAllDnsIps,
+    ResolveCanonicalBootstrapServersOnly,
+}
+
+impl TryFrom<&str> for ClientDnsLookup {
+    type Error = ConfigurationError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "use_all_dns_ips" => Ok(ClientDnsLookup::UseAllDnsIps),
+            "resolve_canonical_bootstrap_servers_only" => Ok(ClientDnsLookup::ResolveCanonicalBootstrapServersOnly),
+            other => Err(ConfigurationError::InvalidClientDnsLookup(other.to_string())),
+        }
+    }
+}
+
+impl TryFrom<Result<&str, ConfigurationError>> for ClientDnsLookup {
+    type Error = ConfigurationError;
+
+    fn try_from(value: Result<&str, ConfigurationError>) -> Result<Self, Self::Error> {
+        match value? {
+            "use_all_dns_ips" => Ok(ClientDnsLookup::UseAllDnsIps),
+            "resolve_canonical_bootstrap_servers_only" => Ok(ClientDnsLookup::ResolveCanonicalBootstrapServersOnly),
+            other => Err(ConfigurationError::InvalidClientDnsLookup(other.to_string())),
+        }
+    }
+}
+
+// TODO: verify the correctness of this enum
+#[derive(Debug, Serialize)]
+pub enum MetricsRecordingLevel {
+    Info,
+    Debug,
+    Trace,
+    Error
+}
+
+pub enum SecurityProtocol {
+    Plaintext,
+    Mtls,
+    Sasl(SaslMethod)
+}
+
+pub enum SaslMethod {
+    Plain,
+    ScramSha256,
+    ScramSha512,
+    Gssapi,
+    OAuthBearer
+}
+
+type JavaClass = String;
+
+#[derive(Debug, Serialize)]
 pub enum ClientProperty {
     BootstrapServers(Vec<SocketAddr>),
+    ClientDnsLookup(ClientDnsLookup),
+    MetadataMaxAgeMs(Duration),
+    SendBufferBytes(i32),
+    RecvBufferBytes(i32),
+    ClientId(String),
+    ClientRack(String),
+    Retries(i32),
+    RetriesBackoffMs(Duration),
     ReconnectBackoffConfig(Duration),
     ReconnectBackoffMaxConfig(Duration),
+    MetricsSampleWindowMs(Duration),
+    MetricsNumSamples(i32),
+    MetricsRecordingLevel(MetricsRecordingLevel),
+    MetricReporterClasses(Vec<JavaClass>), // This will have to be modified 
+    SocketConnectionSetupTimeoutMs(Duration),
+    SocketConnectionSetupTimeoutMaxMs(Duration),
+    ConnectionsMaxIdleMs(Duration),
+    RequestTimeoutMs(Duration),
+    DefaultListKeySerdeInner(JavaClass), // This will have to be modified as the type is javaclass
+    DefaultListValueSerdeInner(JavaClass), // This will have to be modified as the type is javaclass
+    DefaultListKeySerdeType(JavaClass), // This will have to be modified as the type is javaclass
+    DefaultListValueSerdeType(JavaClass), // This will have to be modified as the type is javaclass
+    GroupId(String),
+    GroupInstanceId(String),
+    MaxPollIntervalMs(Duration),
+    RebalanceTimeoutMs(Duration),
+    SessionTimeoutMs(Duration),
+    HeartbeatIntervalMs(Duration),
+    DefaultApiTimeoutMs(Duration),
     None
+}
+
+fn prep_key(value: &str) -> Result<&str, ConfigurationError> {
+    match value.split("=").nth(0) {
+        Some(val) => {
+            let v = val.trim();
+
+            if v.is_empty() {
+                return Err(ConfigurationError::InvalidKey(String::from("Key is Empty")));
+            }
+
+            Ok(val.trim())
+        },
+        None => Err(ConfigurationError::MissingKey(value.to_string())),
+    }
+    
+}
+
+fn prep_value(value: &str) -> Result<&str, ConfigurationError> {
+    match value.split("=").nth(1) {
+        Some(val) =>  {
+            let v = val.trim();
+
+            if v.is_empty() {
+                return Err(ConfigurationError::InvalidKey(String::from("Key is Empty")));
+            }
+
+            Ok(val.trim())
+        },
+        None => Err(ConfigurationError::MissingValue(value.to_string())),
+    }
+}
+
+impl TryFrom<&str> for ClientProperty {
+    type Error = ConfigurationError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            raw if raw.starts_with("bootstrap.servers") => {
+                let val = prep_value(raw)?;
+                let mut servers = Vec::new();
+
+                for server in val.split(",") {
+                    let addr = match server.parse::<SocketAddr>() {
+                        Ok(addr) => addr,
+                        Err(e) => return Err(ConfigurationError::InvalidValueFor(raw.to_string(), e.to_string())),
+                    };
+                    servers.push(addr);
+                }
+
+                Ok(ClientProperty::BootstrapServers(servers))
+            },
+            raw if raw.starts_with("client.dns.lookup") => {
+                let val: ClientDnsLookup = prep_value(raw).try_into()?;
+
+                Ok(ClientProperty::ClientDnsLookup(val))
+            },
+            raw if raw.starts_with("metadata.max.age.ms") => {
+                let val = match prep_value(raw)?.parse::<u64>() {
+                    Ok(val) => val,
+                    Err(e) => return Err(ConfigurationError::InvalidValueFor(raw.to_string(), e.to_string())),
+                };
+
+                Ok(ClientProperty::MetadataMaxAgeMs(Duration::from_millis(val)))
+            },
+            raw if raw.starts_with("send.buffer.bytes") => {
+                let val = match prep_value(raw)?.parse::<i32>() {
+                    Ok(val) => val,
+                    Err(e) => return Err(ConfigurationError::InvalidValueFor(raw.to_string(), e.to_string())),
+                };
+
+                if val < SEND_BUFFER_LOWER_BOUND {
+                    return Err(ConfigurationError::MalformedOption(raw.to_string()));
+                }
+
+                Ok(ClientProperty::SendBufferBytes(val))
+            },
+            raw if raw.starts_with("receive.buffer.bytes") => unimplemented!(""),
+            raw if raw.starts_with("client.id") => unimplemented!(""),
+            raw if raw.starts_with("client.rack") => unimplemented!(""),
+            raw if raw.starts_with("reconnect.backoff.ms") => unimplemented!(""),
+            raw if raw.starts_with("reconnect.backoff.max.ms") => unimplemented!(""),
+            raw if raw.starts_with("retries") => unimplemented!(""),
+            raw if raw.starts_with("retry.backoff.ms") => unimplemented!(""),
+            raw if raw.starts_with("metrics.sample.window.ms") => unimplemented!(""),
+            raw if raw.starts_with("metrics.num.samples") => unimplemented!(""),
+            raw if raw.starts_with("metrics.recording.level") => unimplemented!(""),
+            raw if raw.starts_with("metric.reporters") => unimplemented!(""),
+            raw if raw.starts_with("auto.include.jmx.reporter") => unimplemented!(""),
+            raw if raw.starts_with("security.protocol") => unimplemented!(""),
+            raw if raw.starts_with("socket.connection.setup.timeout.ms") => unimplemented!(""),
+            raw if raw.starts_with("socket.connection.setup.timeout.max.ms") => unimplemented!(""),
+            raw if raw.starts_with("connections.max.idle.ms") => unimplemented!(""),
+            raw if raw.starts_with("request.timeout.ms") => unimplemented!(""),
+            raw if raw.starts_with("group.id") => unimplemented!(""),
+            raw if raw.starts_with("group.instance.id") => unimplemented!(""),
+            raw if raw.starts_with("max.poll.interval.ms") => unimplemented!(""),
+            raw if raw.starts_with("rebalance.timeout.ms") => unimplemented!(""),
+            raw if raw.starts_with("session.timeout.ms") => unimplemented!(""),
+            raw if raw.starts_with("heartbeat.interval.ms") => unimplemented!(""),
+            raw if raw.starts_with("default.api.timeout.ms") => unimplemented!(""),
+            &_ => {
+                // Move to the config parsing function.
+                #[cfg(feature = "fail_invalid_configs")] 
+                {
+
+                }
+
+                Err(ConfigurationError::UnrecognisedKey(value.to_string()))
+            },
+        }
+    }
 }
 
 pub trait ClientConfig {
@@ -96,7 +293,8 @@ const AUTO_INCLUDE_JMX_REPORTER_DOC: &str = "Deprecated. Whether to automaticall
 const SECURITY_PROTOCOL_CONFIG: &str = "security.protocol";
 const SECURITY_PROTOCOL_DOC: &str = concat!("Protocol used to communicate with brokers. Valid values are: {}.", 
     "todo.security.protocols"); // SECURITY_PROTOCOL_CONFIG).as_str(); //TODO: Utils.join(SecurityProtocol.names(), ", ");
-const DEFAULT_SECURITY_PROTOCOL: &str = "PLAINTEXT";
+//const DEFAULT_SECURITY_PROTOCOL: &str = "PLAINTEXT";
+const DEFAULT_SECURITY_PROTOCOL: SecurityProtocol = SecurityProtocol::Plaintext;
 
 const SOCKET_CONNECTION_SETUP_TIMEOUT_MS_CONFIG: &str = "socket.connection.setup.timeout.ms";
 const SOCKET_CONNECTION_SETUP_TIMEOUT_MS_DOC: &str = "The amount of time the client will wait for the socket connection to be established. If the connection is not built before the timeout elapses, clients will close the socket channel.";
@@ -129,7 +327,6 @@ const DEFAULT_LIST_KEY_SERDE_TYPE_CLASS_DOC: &str = concat!("Default class for k
     Note when list serde class is used, one needs to set the inner serde class that implements the <code>org.apache.kafka.common.serialization.Serde</code> interface via 
     '{}'", "default.list.key.serde.inner"); // DEFAULT_LIST_KEY_SERDE_INNER_CLASS
 
-const ASD: &str = concat!("asd,", "asd");
 const DEFAULT_LIST_VALUE_SERDE_TYPE_CLASS: &str = "default.list.value.serde.type";
 const DEFAULT_LIST_VALUE_SERDE_TYPE_CLASS_DOC: &str = concat!("Default class for value that implements the <code>java.util.List</code> interface. 
     This configuration will be read if and only if <code>default.value.serde</code> configuration is set to <code>org.apache.kafka.common.serialization.Serdes.ListSerde</code> 
@@ -270,3 +467,107 @@ where T: ClientConfig + Clone
         }
         return reporters;
     }*/
+
+mod config_tests {
+    use std::net::SocketAddrV4;
+
+    use super::*;
+
+    #[test]
+    fn test_prep_key() {
+        let key = "bootstrap.servers=";
+        let key = prep_key(key).unwrap();
+        assert_eq!(key, "bootstrap.servers");
+    }
+
+    #[test]
+    fn test_prep_value() {
+        let value = "bootstrap.servers=192.168.0.1:9092";
+        let value = prep_value(value).unwrap();
+        assert_eq!(value, "192.168.0.1:9092");
+    }
+
+    #[test]
+    fn test_failed_prep_value() {
+        let mut value = prep_value("bootstrap.servers");
+        assert!(value.is_err());
+        value = prep_value("bootstrap.servers=");
+        assert!(value.is_err());
+    }
+
+    #[test]
+    fn test_failed_prep_key() {
+        let mut value = prep_key("");
+        assert!(value.is_err());        
+        value = prep_key("=");
+        assert!(value.is_err());
+        value = prep_key("=askdnsd");
+        assert!(value.is_err());
+    }
+
+    #[test]
+    fn test_client_propert_try_from() {
+        let mut raw = "bootstrap.servers=192.168.0.1:9092";
+
+        let client_prop_bs_serv = dbg!(ClientProperty::try_from(raw));
+
+        assert!(client_prop_bs_serv.is_ok());
+
+        match ClientProperty::try_from(raw) {
+            Err(_) => unimplemented!(),
+            Ok(ClientProperty::BootstrapServers(val)) => {
+                let reference = vec![
+                    SocketAddr::new([192, 168, 0, 1].into(), 9092)
+                ];
+
+                assert!(val.eq(&reference));
+            },
+            Ok(_) => assert!(false)
+        }
+
+        raw = "bootstrap.servers=192.168.0.1:9092,192.168.0.2:9093";
+
+        let client_prop_bs_serv_multi = dbg!(ClientProperty::try_from(raw));
+
+        assert!(client_prop_bs_serv_multi.is_ok());
+
+        match ClientProperty::try_from(raw) {
+            Err(_) => unimplemented!(),
+            Ok(ClientProperty::BootstrapServers(val)) => {
+                let reference = vec![
+                    SocketAddr::new([192, 168, 0, 1].into(), 9092),
+                    SocketAddr::new([192, 168, 0, 2].into(), 9093)
+                ];
+
+                assert!(val.eq(&reference));
+            },
+            Ok(_) => assert!(false)
+        }
+
+        raw = "bootstrap.servers=192.168.0.1";
+        let client_prop_bs_serv_fail = dbg!(ClientProperty::try_from(raw));
+        assert!(client_prop_bs_serv_fail.is_err());
+
+        raw = "bootstrap.server=192.168.0.1";
+        let client_prop_key_fail = dbg!(ClientProperty::try_from(raw));
+        assert!(client_prop_bs_serv_fail.is_err());
+    }
+
+    #[test]
+    fn test_ser() {
+        let bs = ClientProperty::BootstrapServers(vec![
+            SocketAddr::new([192, 168, 0, 1].into(), 9092),
+            SocketAddr::new([192, 168, 0, 2].into(), 9093)
+        ]);
+        let bs_json = serde_json::to_string(&bs).unwrap();
+        dbg!(bs_json);
+
+        let dnsl = ClientProperty::ClientDnsLookup(ClientDnsLookup::UseAllDnsIps);
+        let dnsl_json = serde_json::to_string(&dnsl).unwrap();
+        dbg!(dnsl_json);
+
+        let v = vec![bs, dnsl];
+        let v_json = serde_json::to_string(&v).unwrap();
+        dbg!(v_json);
+    }
+}

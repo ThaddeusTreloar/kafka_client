@@ -1,3 +1,5 @@
+use serde::de;
+
 pub enum Error {
     Generic(String),
     Configuration(ConfigurationError),
@@ -37,9 +39,17 @@ impl From<KafkaError> for Error {
     }
 }
 
+#[derive(Debug)]
 pub enum ConfigurationError {
     MalformedOption(String),
     MalformedOptions(Vec<String>),
+    InvalidClientDnsLookup(String),
+    UnrecognisedKey(String),
+    MissingKey(String),
+    InvalidKey(String),
+    MissingValue(String),
+    InvalidValue(String),
+    InvalidValueFor(String, String),
 }
 
 pub enum StateStoreError {
