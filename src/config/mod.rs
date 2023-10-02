@@ -14,7 +14,7 @@ pub enum ClientPropertyKey {
     ReconnectBackoffMaxConfigKey,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum ClientDnsLookup {
     UseAllDnsIps,
     ResolveCanonicalBootstrapServersOnly,
@@ -45,7 +45,7 @@ impl TryFrom<Result<&str, ConfigurationError>> for ClientDnsLookup {
 }
 
 // TODO: verify the correctness of this enum
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum MetricsRecordingLevel {
     Info,
     Debug,
@@ -69,7 +69,7 @@ pub enum SaslMethod {
 
 type JavaClass = String;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum ClientProperty {
     BootstrapServers(Vec<SocketAddr>),
     ClientDnsLookup(ClientDnsLookup),

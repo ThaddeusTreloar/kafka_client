@@ -21,6 +21,15 @@ pub struct RecordStream<K, V> {
     b: V,
 }
 
+impl<K, V> Iterator for RecordSet<K, V> {
+    type Item = Record<K, V>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unimplemented!()
+    }
+}
+
+// Some way to guarentee key ordering needs to be developed.
 impl<K, V> Stream for RecordStream<K, V> {
     // TODO
     type Item = Record<K, V>;
@@ -37,14 +46,27 @@ impl<K, V> Stream for RecordStream<K, V> {
     }
 }
 
+#[derive(Debug)]
 pub struct Record<K, V> {
-    a: K,
-    b: V,
+    key: K,
+    value: Option<V>,
 }
 
 impl<K, V> Record<K, V> {
+    pub fn key(&self) -> &K {
+        &self.key
+    }
+
+    pub fn value(&self) -> Option<&V> {
+        if let Some(val) = self.value {
+            Some(&val)
+        } else {
+            None
+        }
+    }
+
     fn from_key_value(key: K, value: V) -> Record<K, V> {
-        Record { a: key, b: value }
+        Record { key, value: Some(value) }
     }
 
     fn with_partition(self, parition: Partition) -> Self {
@@ -69,7 +91,7 @@ impl<K, V> Record<K, V> {
     }
 
     fn from_value(key: K, value: V) -> Record<K, V> {
-        Record { a: key, b: value }
+        Record { key, value: Some(value) }
     }
 }
 

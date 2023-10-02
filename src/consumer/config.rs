@@ -1,15 +1,53 @@
+use std::time::Duration;
+
 use crate::{
     config::{raw_config::RawConfig, ClientProperty},
     error::Error,
 };
 
+#[derive(Debug, Clone)]
 pub struct ConsumerConfig {
-    properties: Vec<ConsumerProperty>,
+    properties: Vec<ConsumerAggregateProperty>,
+}
+
+impl Default for ConsumerConfig {
+    fn default() -> Self {
+        let mut new = Self::new();
+
+        new.properties.push(ConsumerAggregateProperty::Client(
+                ClientProperty::MaxPollIntervalMs(Duration::from_secs(30))
+        ));
+
+        new
+    }
 }
 
 impl ConsumerConfig {
     pub fn new() -> ConsumerConfig {
-        ConsumerConfig { properties: vec![] }
+            ConsumerConfig { properties: vec![] }
+    }
+
+    pub fn push_client_prop(&mut self, property: ClientProperty) {
+            self.properties.push(ConsumerAggregateProperty::Client(property));
+    }
+
+    pub fn push_consumer_prop(&mut self, property: ConsumerProperty) {
+            self.properties.push(ConsumerAggregateProperty::Consumer(property));
+    }
+
+    pub fn get_consumer_prop(&self, property: &ConsumerProperty) -> Option<&ConsumerProperty> {
+        self.properties.iter().find_map(|prop| {
+            match prop {
+                ConsumerAggregateProperty::Consumer(prop) => {
+                    if prop == property {
+                        Some(prop)
+                    } else {
+                        None
+                    }
+                }
+                _ => None
+                }
+        })
     }
 }
 
@@ -21,8 +59,15 @@ impl TryFrom<RawConfig> for ConsumerConfig {
     }
 }
 
-pub enum ConsumerProperty {
+#[derive(Debug, Clone)]
+enum ConsumerAggregateProperty {
     Client(ClientProperty),
+    Consumer(ConsumerProperty)
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ConsumerProperty {
+    SomeProperty(String)
 }
 
 /*

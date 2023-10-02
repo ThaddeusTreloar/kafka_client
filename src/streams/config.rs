@@ -1,6 +1,6 @@
 use crate::{
     config::raw_config::RawConfig,
-    consumer::config::ConsumerProperty,
+    consumer::config::ConsumerAggregateProperty,
     error::{Error, ProducerError},
     prelude::Result,
     producer::config::ProducerProperty,
@@ -19,7 +19,7 @@ impl TryFrom<RawConfig> for StreamsConfig {
 }
 
 pub enum StreamsProperty {
-    ConsumerProperty(ConsumerProperty),
+    ConsumerProperty(ConsumerAggregateProperty),
     ProducerProperty(ProducerProperty),
     ApplicationId(ApplicationId),
 }

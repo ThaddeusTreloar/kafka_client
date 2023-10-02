@@ -1,4 +1,7 @@
+use chrono::NaiveTime;
 use serde::de;
+
+use crate::common::topic::{TopicPartition, PartitionOption, Partition};
 
 pub enum Error {
     Generic(String),
@@ -56,7 +59,42 @@ pub enum StateStoreError {
     StateStoreFailed(String),
 }
 
+#[derive(Debug)]
 pub enum ConsumerError {}
+
+pub enum ConsumerSubscriptionError {
+    InvalidTopic(String),
+    //InvalidPartition(TopicPartition<Partition>),
+    //InvalidOffset(i64),
+    //InvalidTimestamp(i64),
+    //InvalidTime(NaiveTime),
+    //InvalidMetadata(String),
+}
+
+pub enum ConsumerAssignmentError {
+    InvalidTopic(String),
+    InvalidPartition(TopicPartition<Partition>),
+    InvalidOffset(i64),
+    //InvalidTimestamp(i64),
+    //InvalidTime(NaiveTime),
+    //InvalidMetadata(String),
+}
+
+#[derive(Debug)]
+pub enum ConsumerAsyncPollError {
+    InvalidOffset(i64),
+    AuthorisationFailed,
+    AuthenticationFailed,
+    FencedInstance,
+}
+
+pub enum ConsumerSyncPollError {
+    InvalidOffset(i64),
+    Wakeup,
+    AuthorisationFailed,
+    AuthenticationFailed,
+    FencedInstance,
+}
 
 pub enum ProducerError {}
 
