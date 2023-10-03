@@ -9,9 +9,9 @@ use chrono::NaiveTime;
 
 use crate::{
     common::{
-        record::{Offset, Position, RecordMetadata, RecordStream, RecordSet},
+        record::{Offset, Position, RecordMetadata, RecordStream, RecordSet, ConsumerRecord},
         topic::{
-            PartitionOption, Partition, TopicPartition, TopicPartitionList,
+            OptionalPartition, Partition, TopicPartition, TopicPartitionList,
             TopicPartitionMetadataMap,
         },
     },
@@ -44,7 +44,7 @@ pub trait AssignedConsumer<K, V>: Sized {
 
     fn assign(
         &mut self,
-        assignments: TopicPartitionList<PartitionOption>,
+        assignments: TopicPartitionList<OptionalPartition>,
     ) -> TopicPartitionList<Partition>;
     fn assignment(&self) -> TopicPartitionList<Partition>;
     fn unassign(&mut self) -> Result<(), ConsumerAssignmentError>;
@@ -53,8 +53,8 @@ pub trait AssignedConsumer<K, V>: Sized {
 #[cfg(feature = "async_client")]
 #[async_trait(?Send)]
 pub trait AsyncConsumer<K, V>: Drop {
-    async fn poll(&self) -> Result<RecordSet<K, V>, ConsumerAsyncPollError>;
-    fn stream(&self) -> RecordStream<K, V>;
+    async fn poll(&self) -> Result<RecordSet<ConsumerRecord<K, V>>, ConsumerAsyncPollError>;
+    fn stream(&self) -> RecordStream<ConsumerRecord<K, V>>;
     async fn commit(
         &self,
         commit: ConsumerCommit,
@@ -66,7 +66,7 @@ pub trait AsyncConsumer<K, V>: Drop {
     // Find our whether seek or seek_obj is ore ergonomic
     async fn seek(
         &self,
-        topic_partition: TopicPartition<PartitionOption>,
+        topic_partition: TopicPartition<OptionalPartition>,
         offset: Position,
         metadata: Option<RecordMetadata>,
     ) -> Result<Offset, ConsumerError>;
@@ -77,12 +77,12 @@ pub trait AsyncConsumer<K, V>: Drop {
     async fn seek_obj(&self, seek: ConsumerSeek) -> Result<Offset, ConsumerError>;
     async fn position(
         &self,
-        partition: TopicPartitionList<PartitionOption>,
+        partition: TopicPartitionList<OptionalPartition>,
         timeout: Option<Duration>,
     ) -> Result<Offset, ConsumerError>;
     async fn committed(
         &self,
-        partition: TopicPartitionList<PartitionOption>,
+        partition: TopicPartitionList<OptionalPartition>,
         timeout: Option<Duration>,
     ) -> Result<(Offset, RecordMetadata), ConsumerError>;
     async fn partitions(
@@ -93,23 +93,23 @@ pub trait AsyncConsumer<K, V>: Drop {
     async fn topics(&self, timeout: Option<Duration>) -> HashSet<String>;
     async fn beginning(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
         timeout: Option<Duration>,
     ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
     async fn end(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
         timeout: Option<Duration>,
     ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
     async fn metric(&self) -> HashSet<(), ()>; // determine type
     async fn pause(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
     ) -> Result<(), ConsumerError>;
-    async fn paused(&self) -> TopicPartitionList<PartitionOption>;
+    async fn paused(&self) -> TopicPartitionList<OptionalPartition>;
     async fn resume(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
     ) -> TopicPartitionList<Partition>;
     async fn offset_at_timestamp(
         &self,
@@ -118,14 +118,14 @@ pub trait AsyncConsumer<K, V>: Drop {
     ) -> TopicPartitionMetadataMap<(Offset, NaiveTime)>;
     async fn current_lag(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
     ) -> HashMap<TopicPartition<Partition>, Duration>;
     async fn group_metadata(&self) -> Result<ConsumerGroupMetadata, ConsumerError>;
     async fn enforce_rebalance(&self, reason: Option<&str>);
 }
 
 pub trait SyncConsumer<K, V>: Drop {
-    fn poll(&self, timeout: Duration) -> Result<RecordStream<K, V>, ConsumerSyncPollError>;
+    fn poll(&self, timeout: Duration) -> Result<RecordStream<ConsumerRecord<K, V>>, ConsumerSyncPollError>;
     fn commit(
         &self,
         commit: ConsumerCommit,
@@ -136,7 +136,7 @@ pub trait SyncConsumer<K, V>: Drop {
     fn wakeup(&self);
     fn seek(
         &self,
-        topic_partition: TopicPartition<PartitionOption>,
+        topic_partition: TopicPartition<OptionalPartition>,
         offset: Position,
         metadata: Option<RecordMetadata>,
     ) -> Result<Offset, ConsumerError>;
@@ -144,12 +144,12 @@ pub trait SyncConsumer<K, V>: Drop {
     fn seek_obj(&self, seek: ConsumerSeek) -> Result<Offset, ConsumerError>;
     fn position(
         &self,
-        partition: TopicPartitionList<PartitionOption>,
+        partition: TopicPartitionList<OptionalPartition>,
         timeout: Option<Duration>,
     ) -> Result<Offset, ConsumerError>;
     fn committed(
         &self,
-        partition: TopicPartitionList<PartitionOption>,
+        partition: TopicPartitionList<OptionalPartition>,
         timeout: Option<Duration>,
     ) -> Result<(Offset, RecordMetadata), ConsumerError>;
     fn partitions(
@@ -160,20 +160,20 @@ pub trait SyncConsumer<K, V>: Drop {
     fn topics(&self, timeout: Option<Duration>) -> HashSet<String>;
     fn beginning(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
         timeout: Option<Duration>,
     ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
     fn end(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
         timeout: Option<Duration>,
     ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError>;
     fn metric(&self) -> HashSet<(), ()>; // determine type
-    fn pause(&self, partitions: TopicPartitionList<PartitionOption>) -> Result<(), ConsumerError>;
-    fn paused(&self) -> TopicPartitionList<PartitionOption>;
+    fn pause(&self, partitions: TopicPartitionList<OptionalPartition>) -> Result<(), ConsumerError>;
+    fn paused(&self) -> TopicPartitionList<OptionalPartition>;
     fn resume(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
     ) -> TopicPartitionList<Partition>;
     fn offset_at_timestamp(
         &self,
@@ -182,7 +182,7 @@ pub trait SyncConsumer<K, V>: Drop {
     ) -> TopicPartitionMetadataMap<(Offset, NaiveTime)>;
     fn current_lag(
         &self,
-        partitions: TopicPartitionList<PartitionOption>,
+        partitions: TopicPartitionList<OptionalPartition>,
     ) -> HashMap<TopicPartition<Partition>, Duration>;
     fn group_metadata(&self) -> Result<ConsumerGroupMetadata, ConsumerError>;
     fn enforce_rebalance(&self, reason: Option<&str>);
@@ -191,18 +191,18 @@ pub trait SyncConsumer<K, V>: Drop {
 pub enum ConsumerCommit {
     All,
     Topics(HashSet<String>),
-    Partitions(TopicPartitionList<PartitionOption>),
+    Partitions(TopicPartitionList<OptionalPartition>),
     Offsets(TopicPartitionMetadataMap<Offset>),
 }
 
 pub struct ConsumerSeek {
-    topic_partition: TopicPartition<PartitionOption>,
+    topic_partition: TopicPartition<OptionalPartition>,
     offset: Position,
     metadata: Option<()>, // TODO: Figure out type
 }
 
 impl ConsumerSeek {
-    fn new(topic_partition: TopicPartition<PartitionOption>, offset: Position) -> Self {
+    fn new(topic_partition: TopicPartition<OptionalPartition>, offset: Position) -> Self {
         ConsumerSeek {
             topic_partition,
             offset,
@@ -224,11 +224,11 @@ mod consumer_test {
     use std::{time::Duration, collections::{HashSet, HashMap}, fmt::Debug};
 
     use chrono::NaiveTime;
-    use futures::{StreamExt, Future};
+    use futures::{StreamExt, Future, task::SpawnExt};
 
-    use crate::{common::{record::{RecordStream, Position, RecordMetadata, Offset, RecordSet, Record}, topic::{TopicPartitionMetadataMap, TopicPartition, PartitionOption, TopicPartitionList, Partition}}, error::{ConsumerAsyncPollError, ConsumerError, ConsumerSubscriptionError, ConsumerAssignmentError}, consumer::config::{ConsumerConfig, ConsumerProperty}, config::{ClientProperty, ClientDnsLookup}};
+    use crate::{common::{record::{RecordStream, Position, RecordMetadata, Offset, RecordSet, ConsumerRecord, ConsumerRecordBuilder, ProducerRecordBuilder}, topic::{TopicPartitionMetadataMap, TopicPartition, OptionalPartition, TopicPartitionList, Partition}}, error::{ConsumerAsyncPollError, ConsumerError, ConsumerSubscriptionError, ConsumerAssignmentError}, consumer::config::{ConsumerConfig, ConsumerProperty}, config::{ClientProperty, ClientDnsLookup}, producer};
 
-    use super::{AsyncConsumer, ConsumerCommit, ConsumerSeek, ConsumerGroupMetadata, SubscriberConsumer, AssignedConsumer, AssignedConsumerType, SubscriberConsumerType};
+    use super::{ConsumerCommit, ConsumerSeek, ConsumerGroupMetadata, SubscriberConsumer, AssignedConsumer, AssignedConsumerType, SubscriberConsumerType, AsyncConsumer};
 
     struct TestConsumer<K, V, M> {
         key_type: std::marker::PhantomData<K>,
@@ -244,10 +244,10 @@ mod consumer_test {
 
     #[async_trait::async_trait(?Send)]
     impl <K, V, M> AsyncConsumer<K, V> for TestConsumer<K, V, M> {
-        async fn poll(&self) -> Result<RecordSet<K, V>, ConsumerAsyncPollError> {
+        async fn poll(&self) -> Result<RecordSet<ConsumerRecord<K, V>>, ConsumerAsyncPollError> {
             unimplemented!()
         }
-        fn stream(&self) -> RecordStream<K, V> {
+        fn stream(&self) -> RecordStream<ConsumerRecord<K, V>> {
             unimplemented!()
         }
         async fn commit(
@@ -270,7 +270,7 @@ mod consumer_test {
         // Find our whether seek or seek_obj is ore ergonomic
         async fn seek(
             &self,
-            topic_partition: TopicPartition<PartitionOption>,
+            topic_partition: TopicPartition<OptionalPartition>,
             offset: Position,
             metadata: Option<RecordMetadata>,
         ) -> Result<Offset, ConsumerError> {
@@ -287,14 +287,14 @@ mod consumer_test {
         }
         async fn position(
             &self,
-            partition: TopicPartitionList<PartitionOption>,
+            partition: TopicPartitionList<OptionalPartition>,
             timeout: Option<Duration>,
         ) -> Result<Offset, ConsumerError> {
             unimplemented!()
         }
         async fn committed(
             &self,
-            partition: TopicPartitionList<PartitionOption>,
+            partition: TopicPartitionList<OptionalPartition>,
             timeout: Option<Duration>,
         ) -> Result<(Offset, RecordMetadata), ConsumerError> {
             unimplemented!()
@@ -311,14 +311,14 @@ mod consumer_test {
         }
         async fn beginning(
             &self,
-            partitions: TopicPartitionList<PartitionOption>,
+            partitions: TopicPartitionList<OptionalPartition>,
             timeout: Option<Duration>,
         ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError> {
             unimplemented!()
         }
         async fn end(
             &self,
-            partitions: TopicPartitionList<PartitionOption>,
+            partitions: TopicPartitionList<OptionalPartition>,
             timeout: Option<Duration>,
         ) -> Result<TopicPartitionMetadataMap<Offset>, ConsumerError> {
             unimplemented!()
@@ -328,16 +328,16 @@ mod consumer_test {
         } // determine type
         async fn pause(
             &self,
-            partitions: TopicPartitionList<PartitionOption>,
+            partitions: TopicPartitionList<OptionalPartition>,
         ) -> Result<(), ConsumerError> {
             unimplemented!()
         }
-        async fn paused(&self) -> TopicPartitionList<PartitionOption> {
+        async fn paused(&self) -> TopicPartitionList<OptionalPartition> {
             unimplemented!()
         }
         async fn resume(
             &self,
-            partitions: TopicPartitionList<PartitionOption>,
+            partitions: TopicPartitionList<OptionalPartition>,
         ) -> TopicPartitionList<Partition> {
             unimplemented!()
         }
@@ -350,7 +350,7 @@ mod consumer_test {
         }
         async fn current_lag(
             &self,
-            partitions: TopicPartitionList<PartitionOption>,
+            partitions: TopicPartitionList<OptionalPartition>,
         ) -> HashMap<TopicPartition<Partition>, Duration> {
             unimplemented!()
         }
@@ -397,7 +397,7 @@ mod consumer_test {
 
         fn assign(
             &mut self,
-            assignments: TopicPartitionList<PartitionOption>,
+            assignments: TopicPartitionList<OptionalPartition>,
         ) -> TopicPartitionList<Partition> {
             unimplemented!()
         }
@@ -411,7 +411,7 @@ mod consumer_test {
         }
     }
 
-    async fn return_val<K, V>(r: Record<K, V>) -> Option<V> 
+    async fn return_val<K, V>(r: ConsumerRecord<K, V>) -> Option<V> 
     where V: Clone
     {
         match r.value() {
@@ -442,7 +442,7 @@ mod consumer_test {
 
         some_consumer.subscribe(HashSet::new());
 
-        let immut_consumer: TestConsumer<String, String, SubscriberConsumerType> 
+        let immutable_consumer: TestConsumer<String, String, SubscriberConsumerType> 
         = match TestConsumer::new_subscribed(config, HashSet::new()) {
             Ok(consumer) => consumer,
             Err(_) => panic!("Error creating consumer"),
@@ -460,8 +460,22 @@ mod consumer_test {
             }
         }
 
-        immut_consumer.stream()
+        immutable_consumer.stream()
             .filter_map(return_val)
-            .for_each(print_val);
+            .for_each(print_val)
+            .await;
+
+        let consumer_record = ConsumerRecordBuilder::from_key_value("", "")
+            .with_topic_partition(TopicPartition::new_partitioned("", 0))
+            .with_header(String::new(), String::new())
+            .with_offset(0)
+            .with_timestamp(0)
+            .into_record();
+
+        let producer_record = ProducerRecordBuilder::from_key_value("", "")
+            .with_topic_partition(TopicPartition::new_partitioned("", 0))
+            .with_header(String::new(), String::new())
+            .with_timestamp(0)
+            .into_record();
     }
 }

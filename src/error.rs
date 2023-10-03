@@ -1,7 +1,7 @@
 use chrono::NaiveTime;
 use serde::de;
 
-use crate::common::topic::{TopicPartition, PartitionOption, Partition};
+use crate::common::topic::{TopicPartition, OptionalPartition, Partition};
 
 pub enum Error {
     Generic(String),

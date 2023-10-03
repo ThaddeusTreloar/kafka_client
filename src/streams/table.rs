@@ -57,7 +57,7 @@ where
     pub fn start(self) {}
 }
 
-fn process_table_message<K, V>(store: Arc<RwLock<HashMap<String, String>>>, message: Record<K, V>) {
+fn process_table_message<K, V>(store: Arc<RwLock<HashMap<String, String>>>, message: impl Record<K, V>) {
     unimplemented!()
 }
 /*

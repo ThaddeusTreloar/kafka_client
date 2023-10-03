@@ -8,7 +8,7 @@ use std::{
 use super::record::{Offset, RecordMetadata};
 
 pub type Partition = i32;
-pub type PartitionOption = Option<Partition>;
+pub type OptionalPartition = Option<Partition>;
 
 pub enum Metadata {
     Offset(Offset),
@@ -44,17 +44,17 @@ pub struct TopicPartitionList<T> {
     set: HashSet<TopicPartition<T>>,
 }
 
-impl TopicPartitionList<PartitionOption> {
+impl TopicPartitionList<OptionalPartition> {
     fn new() -> Self {
         TopicPartitionList {
             set: HashSet::new(),
         }
     }
 
-    fn add_topic(&mut self, topic: &str) -> TopicPartitionList<PartitionOption> {
+    fn add_topic(&mut self, topic: &str) -> TopicPartitionList<OptionalPartition> {
         let (mut retain, out): (
-            HashSet<TopicPartition<PartitionOption>>,
-            HashSet<TopicPartition<PartitionOption>>,
+            HashSet<TopicPartition<OptionalPartition>>,
+            HashSet<TopicPartition<OptionalPartition>>,
         ) = self
             .set
             .clone()
@@ -78,7 +78,7 @@ impl TopicPartitionList<PartitionOption> {
             .for_each(|partition| self.add_partition(topic, &partition));
     }
 
-    fn get_topic<'a>(&self, topic: impl Into<&'a str>) -> TopicPartitionList<PartitionOption> {
+    fn get_topic<'a>(&self, topic: impl Into<&'a str>) -> TopicPartitionList<OptionalPartition> {
         let s_ref: &str = topic.into();
 
         self.set
@@ -88,14 +88,14 @@ impl TopicPartitionList<PartitionOption> {
     }
 }
 
-impl FromIterator<TopicPartition<PartitionOption>> for TopicPartitionList<PartitionOption> {
-    fn from_iter<T: IntoIterator<Item = TopicPartition<PartitionOption>>>(iter: T) -> Self {
+impl FromIterator<TopicPartition<OptionalPartition>> for TopicPartitionList<OptionalPartition> {
+    fn from_iter<T: IntoIterator<Item = TopicPartition<OptionalPartition>>>(iter: T) -> Self {
         iter.into_iter().collect()
     }
 }
 
-impl<'a> FromIterator<&'a TopicPartition<PartitionOption>> for TopicPartitionList<PartitionOption> {
-    fn from_iter<T: IntoIterator<Item = &'a TopicPartition<PartitionOption>>>(iter: T) -> Self {
+impl<'a> FromIterator<&'a TopicPartition<OptionalPartition>> for TopicPartitionList<OptionalPartition> {
+    fn from_iter<T: IntoIterator<Item = &'a TopicPartition<OptionalPartition>>>(iter: T) -> Self {
         iter.into_iter().collect()
     }
 }
@@ -108,14 +108,14 @@ impl<T> From<TopicPartitionMetadataMap<T>> for TopicPartitionList<Partition> {
     }
 }
 
-impl From<HashSet<TopicPartition<PartitionOption>>> for TopicPartitionList<PartitionOption> {
-    fn from(value: HashSet<TopicPartition<PartitionOption>>) -> Self {
+impl From<HashSet<TopicPartition<OptionalPartition>>> for TopicPartitionList<OptionalPartition> {
+    fn from(value: HashSet<TopicPartition<OptionalPartition>>) -> Self {
         TopicPartitionList { set: value }
     }
 }
 
-impl From<TopicPartition<PartitionOption>> for TopicPartitionList<PartitionOption> {
-    fn from(value: TopicPartition<PartitionOption>) -> Self {
+impl From<TopicPartition<OptionalPartition>> for TopicPartitionList<OptionalPartition> {
+    fn from(value: TopicPartition<OptionalPartition>) -> Self {
         let mut set = HashSet::new();
         set.insert(value);
         TopicPartitionList { set }
@@ -128,8 +128,32 @@ pub struct TopicPartition<T> {
     partition: T,
 }
 
+impl <T> TopicPartition<T> {
+    pub fn topic(&self) -> &str {
+        self.topic.as_str()
+    }
+
+    pub fn with_partition(self, partition: Partition) -> TopicPartition<Partition> {
+        TopicPartition {
+            topic: self.topic,
+            partition,
+        }
+    }
+
+    pub fn with_partition_option(self, partition: Option<Partition>) -> TopicPartition<OptionalPartition> {
+        TopicPartition {
+            topic: self.topic,
+            partition: partition,
+        }
+    }
+
+    pub fn partition(&self) -> &T {
+        &self.partition
+    }
+}
+
 impl TopicPartition<Partition> {
-    fn new(topic: &str, partition: Partition) -> TopicPartition<Partition> {
+    pub fn new_partitioned(topic: &str, partition: Partition) -> Self {
         TopicPartition {
             topic: String::from(topic),
             partition,
@@ -137,8 +161,8 @@ impl TopicPartition<Partition> {
     }
 }
 
-impl TopicPartition<PartitionOption> {
-    fn new(topic: &str, partition: Option<Partition>) -> TopicPartition<PartitionOption> {
+impl TopicPartition<OptionalPartition> {
+    pub fn new(topic: &str, partition: Option<Partition>) -> TopicPartition<OptionalPartition> {
         TopicPartition {
             topic: String::from(topic),
             partition,
@@ -164,7 +188,7 @@ impl From<(String, Partition)> for TopicPartition<Partition> {
     }
 }
 
-impl From<(&str, &Partition)> for TopicPartition<PartitionOption> {
+impl From<(&str, &Partition)> for TopicPartition<OptionalPartition> {
     fn from(value: (&str, &Partition)) -> Self {
         TopicPartition {
             topic: String::from(value.0),
@@ -173,7 +197,7 @@ impl From<(&str, &Partition)> for TopicPartition<PartitionOption> {
     }
 }
 
-impl From<(String, Partition)> for TopicPartition<PartitionOption> {
+impl From<(String, Partition)> for TopicPartition<OptionalPartition> {
     fn from(value: (String, Partition)) -> Self {
         TopicPartition {
             topic: value.0,
@@ -182,7 +206,7 @@ impl From<(String, Partition)> for TopicPartition<PartitionOption> {
     }
 }
 
-impl From<&str> for TopicPartition<PartitionOption> {
+impl From<&str> for TopicPartition<OptionalPartition> {
     fn from(value: &str) -> Self {
         TopicPartition {
             topic: String::from(value),
@@ -191,7 +215,30 @@ impl From<&str> for TopicPartition<PartitionOption> {
     }
 }
 
-impl From<String> for TopicPartition<PartitionOption> {
+impl From<TopicPartition<Partition>> for TopicPartition<OptionalPartition> {
+    fn from(value: TopicPartition<Partition>) -> Self {
+        TopicPartition {
+            topic: value.topic,
+            partition: Some(value.partition),
+        }
+    }
+}
+
+impl TryFrom<TopicPartition<OptionalPartition>> for TopicPartition<Partition> {
+    type Error = (); // TODO: Make Error type
+
+    fn try_from(value: TopicPartition<OptionalPartition>) -> Result<Self, Self::Error> {
+        match value.partition {
+            Some(partition) => Ok(TopicPartition {
+                topic: value.topic,
+                partition,
+            }),
+            None => unimplemented!(),
+        }
+    }
+}
+
+impl From<String> for TopicPartition<OptionalPartition> {
     fn from(value: String) -> Self {
         TopicPartition {
             topic: value,

@@ -60,7 +60,7 @@ impl TryFrom<RawConfig> for ConsumerConfig {
 }
 
 #[derive(Debug, Clone)]
-enum ConsumerAggregateProperty {
+pub enum ConsumerAggregateProperty {
     Client(ClientProperty),
     Consumer(ConsumerProperty)
 }
