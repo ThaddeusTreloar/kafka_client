@@ -26,19 +26,19 @@ use super::store::{common::StateStore, in_memory::InMemoryStateStore};
 pub struct IdleStreamTable;
 pub struct InitialisedStreamTable;
 
-pub struct StreamTable<S, K, V>
+pub struct StreamTable<'a, S, K, V>
 where
     K: From<Vec<u8>> + Into<Vec<u8>> + std::cmp::Eq + PartialEq + Hash,
     V: From<Vec<u8>> + Into<Vec<u8>>,
 {
-    input_stream: Arc<dyn AsyncConsumer<K, V>>,
+    input_stream: Arc<dyn AsyncConsumer<'a, K, V>>,
     state_store: Arc<dyn StateStore<K, V> + Send + Sync>,
     commit_store: Arc<dyn StateStore<K, V> + Send + Sync>,
     topic: String,
     state: PhantomData<S>,
 }
 
-impl<K, V> StreamTable<IdleStreamTable, K, V>
+impl<'a, K, V> StreamTable<'a, IdleStreamTable, K, V>
 where
     K: From<Vec<u8>> + Into<Vec<u8>> + std::cmp::Eq + PartialEq + Hash,
     V: From<Vec<u8>> + Into<Vec<u8>> + Clone,
@@ -46,11 +46,11 @@ where
     pub fn new(
         input: &ConsumerConfig,
         topic: &str,
-    ) -> Result<StreamTable<IdleStreamTable, K, V>, KafkaError> {
+    ) -> Result<StreamTable<'a, IdleStreamTable, K, V>, KafkaError> {
         unimplemented!()
     }
 
-    pub fn into_running(self) -> StreamTable<InitialisedStreamTable, K, V> {
+    pub fn into_running(self) -> StreamTable<'a, InitialisedStreamTable, K, V> {
         unimplemented!()
     }
 

@@ -1,57 +1,46 @@
 use chrono::NaiveTime;
 use serde::de;
+use serde_json::error;
 
 use crate::common::topic::{TopicPartition, OptionalPartition, Partition};
 
+// TODO: The not so glamorous job of designing informative errors.... 
+
+#[derive(Debug, thiserror::Error) ]
 pub enum Error {
+    #[error("Generic: {0}")]
     Generic(String),
-    Configuration(ConfigurationError),
-    Consumer(ConsumerError),
-    Producer(ProducerError),
-    Kafka(KafkaError),
-    StateStore(StateStoreError),
+    #[error(transparent)]
+    Configuration(#[from] ConfigurationError),
+    //#[error("Consumer: {0}")]
+    //Consumer(ConsumerError),
+    //#[error("Producer: {0}")]
+    //Producer(ProducerError),
+    //#[error("Kafka: {0}")]
+    //Kafka(KafkaError),
+    //#[error("StateStore: {0}")]
+    //StateStore(StateStoreError),
 }
 
-impl From<ConfigurationError> for Error {
-    fn from(value: ConfigurationError) -> Self {
-        Error::Configuration(value)
-    }
-}
-
-impl From<StateStoreError> for Error {
-    fn from(value: StateStoreError) -> Self {
-        Error::StateStore(value)
-    }
-}
-
-impl From<ConsumerError> for Error {
-    fn from(value: ConsumerError) -> Self {
-        Error::Consumer(value)
-    }
-}
-
-impl From<ProducerError> for Error {
-    fn from(value: ProducerError) -> Self {
-        Error::Producer(value)
-    }
-}
-
-impl From<KafkaError> for Error {
-    fn from(value: KafkaError) -> Self {
-        Error::Kafka(value)
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ConfigurationError {
+    #[error("Malformed Option: {0}")]
     MalformedOption(String),
+    #[error("Malformed Options: {0:?}")]
     MalformedOptions(Vec<String>),
+    #[error("Missing Option: {0}")]
     InvalidClientDnsLookup(String),
+    #[error("Unrecognised Key: {0}")]
     UnrecognisedKey(String),
+    #[error("Key Missing: {0}")]
     MissingKey(String),
+    #[error("Invalid Key: {0}")]
     InvalidKey(String),
+    #[error("Missing Value: {0}")]
     MissingValue(String),
+    #[error("Invalid Value: {0}")]
     InvalidValue(String),
+    #[error("Invalid Invalid Value: {0} for: {1}")]
     InvalidValueFor(String, String),
 }
 
@@ -59,8 +48,10 @@ pub enum StateStoreError {
     StateStoreFailed(String),
 }
 
-#[derive(Debug)]
-pub enum ConsumerError {}
+#[derive(Debug, thiserror::Error)]
+pub enum ConsumerError {
+
+}
 
 pub enum ConsumerSubscriptionError {
     InvalidTopic(String),
@@ -96,7 +87,17 @@ pub enum ConsumerSyncPollError {
     FencedInstance,
 }
 
-pub enum ProducerError {}
+#[derive(Debug, thiserror::Error)]
+pub enum ProducerError {
+    #[error("Unknown Error")]
+    Unknown // TODO: This is a placeholder. MUST be removed
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum TransactionError {
+    #[error("Producer Fenced: {0}")]
+    ProducerFenced(String)
+}
 
 pub enum KafkaError {
     ProducerError(ProducerError),

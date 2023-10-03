@@ -32,6 +32,17 @@ impl From<(TopicPartition<Partition>, (Offset, RecordMetadata))>
     }
 }
 
+impl From<(TopicPartition<Partition>, Offset)>
+    for TopicPartitionMetadataMap<Offset>
+{
+    fn from(value: (TopicPartition<Partition>, Offset)) -> Self {
+        let mut map = HashMap::new();
+        map.insert(value.0, value.1);
+
+        TopicPartitionMetadataMap { map }
+    }
+}
+
 impl TopicPartitionMetadataMap<Offset> {
     fn new() -> TopicPartitionMetadataMap<Offset> {
         TopicPartitionMetadataMap {

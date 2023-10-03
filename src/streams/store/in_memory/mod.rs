@@ -49,14 +49,14 @@ where
                 Some(v) => Some(v.clone()),
                 None => None,
             }),
-            Err(e) => Err(StateStoreError::StateStoreFailed(e.to_string()).into()),
+            Err(e) => unimplemented!()//Err(StateStoreError::StateStoreFailed(e.to_string()).into()),
         }
     }
 
     fn put(&self, k: T, v: U) -> Result<Option<U>> {
         match self.store.write() {
             Ok(mut lock) => Ok(lock.insert(k, v)),
-            Err(e) => Err(StateStoreError::StateStoreFailed(e.to_string()).into()),
+            Err(e) => unimplemented!()//Err(StateStoreError::StateStoreFailed(e.to_string()).into()),
         }
     }
 }
