@@ -39,6 +39,7 @@ impl<T> Iterator for RecordSet<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct RecordStream<T> {
     a: Vec<T>,
 }

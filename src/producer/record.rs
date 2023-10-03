@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, fmt::Display};
 
 use chrono::offset;
 use futures::Stream;
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::{
     record::Record,
-    topic::{OptionalPartition, Partition, TopicPartition},
+    topic::{OptionalPartition, Partition, TopicPartition, fmt_optional_partition},
 };
 
 pub type RecordMetadata = ();
@@ -20,6 +20,17 @@ pub struct ProducerRecord<K, V> {
     value: Option<V>,
 }
 
+impl <K, V> Display for ProducerRecord<K, V>
+where K: Display, V: Display {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut headers = String::new();
+        for (key, value) in &self.headers {
+            headers.push_str(&format!("{}: {}\n", key, value));
+        }
+
+        write!(f, "Headers:\n{}\nKey: {}\nValue: {}\nTopicPartition: {:?}\nTimestamp: {}", headers, self.key.as_ref().unwrap(), self.value.as_ref().unwrap(), self.topic_partition, self.timestamp.unwrap())
+    }
+}
 
 impl<K, V> From<ProducerRecordBuilder<K, V, TopicPartition<OptionalPartition>>> for ProducerRecord<K, V> {
     fn from(builder: ProducerRecordBuilder<K, V, TopicPartition<OptionalPartition>>) -> Self {

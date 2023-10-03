@@ -94,6 +94,19 @@ pub enum ProducerError {
 }
 
 #[derive(Debug, thiserror::Error)]
+pub enum ProducerMetadataError {
+    #[error("Invalid Topic: {0}")]
+    InvalidTopic(String),
+    #[error("Invalid Partition: {0}")]
+    InvalidPartition(TopicPartition<Partition>),
+    #[error("Invalid Offset: {0}")]
+    InvalidOffset(i64),
+    //InvalidTimestamp(i64),
+    //InvalidTime(NaiveTime),
+    //InvalidMetadata(String),
+}
+
+#[derive(Debug, thiserror::Error)]
 pub enum TransactionError {
     #[error("Producer Fenced: {0}")]
     ProducerFenced(String)
