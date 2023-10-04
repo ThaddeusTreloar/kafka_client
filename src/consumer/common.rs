@@ -67,18 +67,18 @@ impl <GID, GENID, MID> ConsumerGroupMetadataBuilder<GID, GENID, MID> {
         }
     }
 
-    pub fn with_group_instance_id(self, group_instance_id: String) -> Self {
+    pub fn with_group_instance_id(self, group_instance_id: impl Into<String>) -> Self {
         Self {
             group_id: self.group_id,
-            group_instance_id: Some(group_instance_id),
+            group_instance_id: Some(group_instance_id.into()),
             generation_id: self.generation_id,
             member_id: self.member_id,
         }
     }
 
-    pub fn with_group_id(self, group_id: String) -> ConsumerGroupMetadataBuilder<String, GENID, MID> {
+    pub fn with_group_id(self, group_id: impl Into<String>) -> ConsumerGroupMetadataBuilder<String, GENID, MID> {
         ConsumerGroupMetadataBuilder {
-            group_id,
+            group_id: group_id.into(),
             group_instance_id: self.group_instance_id,
             generation_id: self.generation_id,
             member_id: self.member_id,
@@ -94,12 +94,12 @@ impl <GID, GENID, MID> ConsumerGroupMetadataBuilder<GID, GENID, MID> {
         }
     }
 
-    pub fn with_member_id(self, member_id: String) -> ConsumerGroupMetadataBuilder<GID, GENID, String> {
+    pub fn with_member_id(self, member_id: impl Into<String>) -> ConsumerGroupMetadataBuilder<GID, GENID, String> {
         ConsumerGroupMetadataBuilder {
             group_id: self.group_id,
             group_instance_id: self.group_instance_id,
             generation_id: self.generation_id,
-            member_id,
+            member_id: member_id.into(),
         }
     }
 }

@@ -4,6 +4,7 @@ use futures::{
     stream::{FilterMap, ForEach},
     Future, StreamExt,
 };
+use serde::Deserialize;
 use std::{
     collections::HashMap,
     hash::Hash,
@@ -57,7 +58,8 @@ where
     pub fn start(self) {}
 }
 
-fn process_table_message<K, V>(store: Arc<RwLock<HashMap<String, String>>>, message: impl Record<K, V>) {
+fn process_table_message<K, V>(store: Arc<RwLock<HashMap<String, String>>>, message: impl Record<K, V>) 
+{
     unimplemented!()
 }
 /*

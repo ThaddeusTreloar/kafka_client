@@ -3,6 +3,7 @@ use std::{marker::PhantomData, fmt::Display};
 use chrono::offset;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::common::{
     record::Record,
@@ -11,7 +12,7 @@ use crate::common::{
 
 pub type RecordMetadata = ();
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProducerRecord<K, V> {
     headers: Vec<(String, String)>,
     key: Option<K>,
@@ -20,15 +21,22 @@ pub struct ProducerRecord<K, V> {
     value: Option<V>,
 }
 
+
 impl <K, V> Display for ProducerRecord<K, V>
-where K: Display, V: Display {
+where K: Display + Serialize, V: Display + Serialize {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Consider rewriting this function to just serialise the struct and write
         let mut headers = String::new();
         for (key, value) in &self.headers {
             headers.push_str(&format!("{}: {}\n", key, value));
         }
 
-        write!(f, "Headers:\n{}\nKey: {}\nValue: {}\nTopicPartition: {:?}\nTimestamp: {}", headers, self.key.as_ref().unwrap(), self.value.as_ref().unwrap(), self.topic_partition, self.timestamp.unwrap())
+        let json = match serde_json::to_string(&self) {
+            Ok(json) => json,
+            Err(e) => format!("Error serialising ProducerRecord: {}", e),
+        };
+        
+        write!(f, "ProducerRecord: {}", json)
     }
 }
 
@@ -87,6 +95,19 @@ impl<K, V> ProducerRecord<K, V> {
     }
 }
 
+impl <K, V> ProducerRecord<K, V>
+where K: Clone, V: Clone {
+    fn from_record(record: impl Record<K, V>) -> Self {
+        ProducerRecord {
+            headers: Vec::new(),
+            key: record.key().cloned(),
+            topic_partition: TopicPartition::from(String::from(record.topic())),
+            timestamp: None,
+            value: record.value().cloned(),
+        }
+    }
+}
+
 impl<K, V> Record<K, V> for ProducerRecord<K, V> {
     fn key(&self) -> Option<&K> {
         if let Some(key) = &self.key {
@@ -102,6 +123,14 @@ impl<K, V> Record<K, V> for ProducerRecord<K, V> {
         } else {
             None
         }
+    }
+
+    fn timestamp(&self) -> Option<i64> {
+        self.timestamp
+    }
+
+    fn topic(&self) -> &str {
+        self.topic_partition.topic()
     }
 }
 
@@ -133,9 +162,9 @@ impl<K, V, TP> ProducerRecordBuilder<K, V, TP> {
         }
     }
 
-    pub fn with_topic<T>(
+    pub fn with_topic(
         self,
-        topic: String,
+        topic: impl Into<TopicPartition<OptionalPartition>>,
     ) -> ProducerRecordBuilder<K, V, TopicPartition<OptionalPartition>> {
         ProducerRecordBuilder {
             headers: self.headers,

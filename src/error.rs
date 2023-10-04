@@ -90,6 +90,26 @@ pub enum ConsumerSyncPollError {
 #[derive(Debug, thiserror::Error)]
 pub enum ProducerError {
     #[error("Unknown Error")]
+    Unknown, // TODO: This is a placeholder. MUST be removed
+    #[error(transparent)]
+    Cleanup(CleanupError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ProducerSendError {
+    #[error("Unknown Error")]
+    Unknown, // TODO: This is a placeholder. MUST be removed
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ProducerFlushError {
+    #[error("Unknown Error")]
+    Unknown, // TODO: This is a placeholder. MUST be removed
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CleanupError {
+    #[error("Unknown Error")]
     Unknown // TODO: This is a placeholder. MUST be removed
 }
 

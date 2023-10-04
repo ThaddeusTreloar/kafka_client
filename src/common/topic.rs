@@ -250,6 +250,15 @@ impl From<(String, Partition)> for TopicPartition<OptionalPartition> {
     }
 }
 
+impl From<(String, OptionalPartition)> for TopicPartition<OptionalPartition> {
+    fn from(value: (String, OptionalPartition)) -> Self {
+        TopicPartition {
+            topic: value.0,
+            partition: value.1,
+        }
+    }
+}
+
 impl From<&str> for TopicPartition<OptionalPartition> {
     fn from(value: &str) -> Self {
         TopicPartition {

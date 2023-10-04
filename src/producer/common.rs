@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display, time::Duration};
 
 use async_trait::async_trait;
 use futures::Stream;
@@ -6,19 +6,22 @@ use futures::Stream;
 use crate::{
     common::{
         record::{Offset, Record, RecordSet, RecordStream},
-        topic::{OptionalPartition, Partition, TopicPartition, TopicPartitionMetadataMap, TopicPartitionList},
+        topic::{
+            OptionalPartition, Partition, TopicPartition, TopicPartitionList,
+            TopicPartitionMetadataMap,
+        },
     },
     consumer::common::ConsumerGroupMetadata,
-    error::{ProducerError, TransactionError, ProducerMetadataError},
+    error::{
+        CleanupError, ProducerError, ProducerMetadataError, ProducerSendError, TransactionError,
+    },
+    metadata::metrics::{Metric, MetricId},
 };
 
 use super::record::ProducerRecord;
 
 struct Transactional;
 struct NonTransactional;
-
-pub trait Producer<K, V> {}
-
 pub struct Transaction {}
 
 impl Display for Transaction {
@@ -49,8 +52,23 @@ impl Transaction {
     }
 }
 
-pub trait TransactionalProducer {
+#[async_trait]
+pub trait TransactionalProducer<K, V> {
     fn begin_transaction(&self) -> Result<Transaction, TransactionError>;
+
+    // Consider Revising name
+    // TODO: revise API
+    async fn send_stream_transaction<T>(
+        &self,
+        records: T,
+    ) -> RecordStream<Result<ProducerRecord<K, V>, ProducerError>>
+    where
+        T: Stream + Send,
+        T::Item: Record<K, V>;
+}
+
+pub trait Producer<K, V>: Drop {
+    fn flush(&self);
 }
 
 #[cfg(feature = "async_client")]
@@ -60,38 +78,67 @@ pub trait AsyncProducer<K, V>: Drop {
         &self,
         record: ProducerRecord<K, V>,
     ) -> Result<ProducerRecord<K, V>, ProducerError>; // TODO: investigate using Ok(RecordMetadata). What are the fields of the Java implementation of RecordMetadata?
+
+    async fn send_with_callback<F>(
+        &self,
+        record: ProducerRecord<K, V>,
+        cb: F,
+    ) -> Result<ProducerRecord<K, V>, ProducerSendError>
+    where
+        F: Fn(
+                Result<ProducerRecord<K, V>, ProducerSendError>,
+            ) -> Result<ProducerRecord<String, String>, ProducerSendError>
+            + Send;
+
     async fn send_all(
         &self,
         records: RecordSet<ProducerRecord<K, V>>,
     ) -> RecordSet<Result<ProducerRecord<K, V>, ProducerError>>;
-    async fn send_stream<T>(
+
+    async fn send_stream<T, U>(
         &self,
         records: T,
-    ) -> RecordStream<Result<ProducerRecord<K, V>, ProducerError>>
+    ) -> U
     where
         T: Stream + Send,
-        T::Item: Record<K, V>;
+        T: Into<ProducerRecord<String, String>>,
+        U: Stream + Send,
+        U::Item: Into<Result<ProducerRecord<K, V>, ProducerError>>;
 
-    async fn get_partitions_for_topic(&self, topic: String) -> Result<TopicPartitionList<Partition>, ProducerMetadataError>;
+    // Is this the best place for this?
+    async fn get_partitions_for_topic(
+        &self,
+        topic: String,
+    ) -> Result<TopicPartitionList<Partition>, ProducerMetadataError>;
+
+    fn close(self, timeout: Duration) -> Result<(), CleanupError>;
+    fn metrics(&self) -> Result<HashMap<MetricId, Metric>, CleanupError>;
 }
 
-pub trait SyncProducer<K, V>: Drop {}
-
 mod producer_internal_tests {
-    use std::{marker::PhantomData, sync::Arc};
+    use std::{
+        collections::{HashMap, VecDeque},
+        marker::PhantomData,
+        sync::Arc,
+        thread::sleep,
+        time::Duration,
+    };
 
     use async_trait::async_trait;
-    use futures::{stream::StreamExt, Stream};
+    use futures::{stream::StreamExt, Stream, stream::Map, Future};
     use log::{error, info};
     use tokio::{join, spawn};
 
     use crate::{
         common::{
-            record::{Record, RecordSet, RecordStream, Offset},
-            topic::{OptionalPartition, Partition, TopicPartition, TopicPartitionMetadataMap, TopicPartitionList},
+            record::{Offset, Record, RecordSet, RecordStream},
+            topic::{
+                OptionalPartition, Partition, TopicPartition, TopicPartitionList,
+                TopicPartitionMetadataMap,
+            },
         },
         consumer::common::ConsumerGroupMetadata,
-        error::{ProducerError, TransactionError, ProducerMetadataError},
+        error::{ProducerError, ProducerMetadataError, ProducerSendError, TransactionError},
         producer::record::ProducerRecord,
     };
 
@@ -140,37 +187,85 @@ mod producer_internal_tests {
             &self,
             record: ProducerRecord<String, String>,
         ) -> Result<ProducerRecord<String, String>, ProducerError> {
-            Err(ProducerError::Unknown)
+            Ok(record)
         }
+
+        async fn send_with_callback<F>(
+            &self,
+            record: ProducerRecord<String, String>,
+            cb: F,
+        ) -> Result<ProducerRecord<String, String>, ProducerSendError>
+        where
+            F: Fn(
+                    Result<ProducerRecord<String, String>, ProducerSendError>,
+                ) -> Result<ProducerRecord<String, String>, ProducerSendError>
+                + Send,
+        {
+            cb(Ok(record))
+        }
+
         async fn send_all(
             &self,
             records: RecordSet<ProducerRecord<String, String>>,
         ) -> RecordSet<Result<ProducerRecord<String, String>, ProducerError>> {
             RecordSet::new()
         }
+        
         async fn send_stream<U>(
             &self,
             records: U,
-        ) -> RecordStream<Result<ProducerRecord<String, String>, ProducerError>>
+        ) -> Map<U, dyn Fn(U) -> dyn Future<Output = Result<ProducerRecord<String, String>, ProducerError>>>
         where
-            U: Send,
+            U: Stream + Send,
+            U::Item: Into<ProducerRecord<String, String>>
         {
-            RecordStream::new()
+            let f = |r| async{
+                let record = r;
+                self.send(r.into()).await
+            };
+            records.map(f)
         }
 
-        async fn get_partitions_for_topic(&self, topic: String) -> Result<TopicPartitionList<Partition>, ProducerMetadataError> {
-
+        async fn get_partitions_for_topic(
+            &self,
+            topic: String,
+        ) -> Result<TopicPartitionList<Partition>, ProducerMetadataError> {
             let mut test_list = TopicPartitionList::<Partition>::new();
 
             test_list.add_partition_range(&topic, 0..10);
 
             Ok(test_list)
         }
+
+        fn close(self, timeout: std::time::Duration) -> Result<(), crate::error::CleanupError> {
+            Ok(())
+        }
+
+        fn metrics(
+            &self,
+        ) -> Result<
+            HashMap<crate::producer::common::MetricId, crate::producer::common::Metric>,
+            crate::error::CleanupError,
+        > {
+            Ok(HashMap::new())
+        }
     }
 
-    impl TransactionalProducer for SomeProducer<Transactional> {
+    #[async_trait]
+    impl TransactionalProducer<String, String> for SomeProducer<Transactional> {
         fn begin_transaction(&self) -> Result<Transaction, TransactionError> {
             Ok(Transaction::new())
+        }
+
+        async fn send_stream_transaction<U>(
+            &self,
+            records: U,
+        ) -> RecordStream<Result<ProducerRecord<String, String>, ProducerError>>
+        where
+            U: Stream + Send,
+            U::Item: Record<String, String>,
+        {
+            RecordStream::new()
         }
     }
 
@@ -178,70 +273,57 @@ mod producer_internal_tests {
     async fn testing_ergonomics() {
         std_logger::Config::logfmt().with_call_location(true).init();
 
-        let s = RecordStream::<ProducerRecord<String, String>>::new().map(|r| r);
-
         let producer = SomeProducer::new_transactional();
 
-        if let Ok(list) = producer.get_partitions_for_topic("SomeTopic".into()).await {
+        let producer_ref = Arc::new(producer);
 
-            for tp in list {
-                info!("Topic: {}, Partition: {}", tp.topic(), tp.partition());
+        let rs_records = vec![
+            ProducerRecord::<String, String>::from_key_value("one".into(), "SomeData".into())
+                .with_topic("SomeTopic")
+                .into_record(),
+            ProducerRecord::<String, String>::from_key_value("two".into(), "OtherData".into())
+                .with_topic("SomeTopic")
+                .into_record(),
+            ProducerRecord::<String, String>::from_key_value("three".into(), "MoreData".into())
+                .with_topic("SomeTopic")
+                .into_record(),
+        ];
+
+        let rs_producer = producer_ref.clone();
+        let rs = RecordStream::from(rs_records);
+        let rs_channel = rs.get_channel();
+
+        let rs_join_handle = spawn(producer_ref.send_stream(rs).await.for_each_concurrent(usize::MAX, |r| async {
+            match r {
+                Ok(r) => {
+                    info!("Successful Stream Item: {:?}", r);
+                }
+                Err(e) => {
+                    error!("Failed Stream Item: {}", e);
+                }
             }
+        }));
+
+        for n in 0..20 {
+            match rs_channel.send(
+                ProducerRecord::from_key_value(format!("key{}", n), format!("value{}", n))
+                    .with_topic("AnotherTopic")
+                    .into_record(),
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Error: {}", e);
+                }
+            };
         }
 
-        let transaction = match producer.begin_transaction() {
-            Ok(t) => {
-                info!("{}", t);
-                t
-            },
-            Err(e) => {
-                error!("Error: {}", e);
-                return;
+        match rs_join_handle.await {
+            Ok(_) => {
+                info!("Success");
             }
-        };
-
-        let arc = Arc::new(producer);
-
-        let out_producer = arc.clone();
-        let out_stream = spawn(async move { out_producer.send_stream(s).await });
-
-        match transaction.push_offsets(
-            TopicPartitionMetadataMap::from((TopicPartition::from(("", &5)), 1)),
-            ConsumerGroupMetadata::builder()
-                .with_group_id("test".into())
-                .with_member_id("member_id".into())
-                .with_generation_id(1)
-                .into_consumer_group_metadata(),
-        ) {
-            Ok(_) => {}
             Err(e) => {
                 error!("Error: {}", e);
             }
         }
-
-        match transaction.abort_transaction() {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Error: {}", e);
-            }
-        }
-
-        match join!(out_stream) {
-            (Ok(r),) => {
-                info!("Success: {:?}", r);
-            }
-            (Err(e),) => {
-                error!("Error: {}", e);
-            }
-        };
     }
 }
-
-/*
-void 	close()
-void 	close(Duration timeout)
-void 	flush()
-Map<MetricName,? extends Metric> 	metrics()
-List<PartitionInfo> 	partitionsFor(String topic)
-Future<RecordMetadata> 	send(ProducerRecord<K,V> record, Callback callback)
- */

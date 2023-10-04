@@ -131,6 +131,14 @@ impl <K, V> Record<K, V> for ConsumerRecord<K, V> {
             None
         }
     }
+
+    fn timestamp(&self) -> Option<i64> {
+        Some(self.timestamp)
+    }
+
+    fn topic(&self) -> &str {
+        self.topic_partition.topic()
+    }
 }
 
 impl<K, V> From<ConsumerRecordBuilder<K, V, TopicPartition<Partition>, Offset, i64>>
