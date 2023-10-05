@@ -1,7 +1,8 @@
 use std::{marker::PhantomData, collections::VecDeque, pin::Pin, task::{Context, Poll, Waker}, ops::{DerefMut, Deref}, sync::{Arc, Mutex, mpsc}, thread::{spawn, JoinHandle}};
 
+use async_trait::async_trait;
 use chrono::{offset, DateTime};
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::pin::pin;
@@ -49,7 +50,7 @@ pub struct RecordStream<T> {
     sender: mpsc::Sender<T>,
     //reciever: mpsc::Receiver<T>,
     waker: Arc<Mutex<Option<Waker>>>,
-    channel_thread: JoinHandle<()>,
+    //channel_thread: JoinHandle<()>, T
 }
 
 impl <T> Unpin for RecordStream<T> {}
@@ -61,10 +62,11 @@ where T: Send + 'static
         let (sender, reciever) = mpsc::channel();
         let queue = Arc::new(Mutex::new(VecDeque::new()));
         let waker: Arc<Mutex<Option<Waker>>> = Arc::new(Mutex::new(None));
+
         let queue_ref = queue.clone();
         let waker_ref = waker.clone();
 
-        let thread = spawn(move || {
+        spawn(move || {
             let reciever = reciever;
             let queue = queue_ref;
             let waker = waker_ref;
@@ -90,7 +92,7 @@ where T: Send + 'static
             }
         });
         
-        Self { a: queue, sender, waker: waker, channel_thread: thread }
+        Self { a: queue, sender, waker: waker,}// channel_thread: thread }
     }
     
     // Preferably replace this with a channel

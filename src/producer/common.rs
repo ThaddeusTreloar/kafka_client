@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, time::Duration};
+use std::{collections::HashMap, fmt::Display, time::Duration, pin::Pin};
 
 use async_trait::async_trait;
 use futures::Stream;
@@ -74,10 +74,15 @@ pub trait Producer<K, V>: Drop {
 #[cfg(feature = "async_client")]
 #[async_trait]
 pub trait AsyncProducer<K, V>: Drop {
+    fn send_sync(
+        &self,
+        record: ProducerRecord<K, V>,
+    ) -> Result<ProducerRecord<K, V>, ProducerSendError>; // TODO: investigate using Ok(RecordMetadata). What are the fields of the Java implementation of RecordMetadata?
+
     async fn send(
         &self,
         record: ProducerRecord<K, V>,
-    ) -> Result<ProducerRecord<K, V>, ProducerError>; // TODO: investigate using Ok(RecordMetadata). What are the fields of the Java implementation of RecordMetadata?
+    ) -> Result<ProducerRecord<K, V>, ProducerSendError>; // TODO: investigate using Ok(RecordMetadata). What are the fields of the Java implementation of RecordMetadata?
 
     async fn send_with_callback<F>(
         &self,
@@ -95,16 +100,10 @@ pub trait AsyncProducer<K, V>: Drop {
         records: RecordSet<ProducerRecord<K, V>>,
     ) -> RecordSet<Result<ProducerRecord<K, V>, ProducerError>>;
 
-    async fn send_stream<T, U>(
+    async fn send_stream(
         &self,
-        records: T,
-    ) -> U
-    where
-        T: Stream + Send,
-        T: Into<ProducerRecord<String, String>>,
-        U: Stream + Send,
-        U::Item: Into<Result<ProducerRecord<K, V>, ProducerError>>;
-
+        records: RecordStream<ProducerRecord<K, V>>,
+    ) -> Pin<Box<dyn Stream<Item = Result<ProducerRecord<String, String>, ProducerSendError>>+ Send +'life0>>;
     // Is this the best place for this?
     async fn get_partitions_for_topic(
         &self,
@@ -121,7 +120,7 @@ mod producer_internal_tests {
         marker::PhantomData,
         sync::Arc,
         thread::sleep,
-        time::Duration,
+        time::Duration, pin::Pin,
     };
 
     use async_trait::async_trait;
@@ -183,10 +182,17 @@ mod producer_internal_tests {
     where
         T: Sync,
     {
+        fn send_sync(
+            &self,
+            record: ProducerRecord<String, String>,
+        ) -> Result<ProducerRecord<String, String>, ProducerSendError> {
+            Ok(record)
+        }
+
         async fn send(
             &self,
             record: ProducerRecord<String, String>,
-        ) -> Result<ProducerRecord<String, String>, ProducerError> {
+        ) -> Result<ProducerRecord<String, String>, ProducerSendError> {
             Ok(record)
         }
 
@@ -211,19 +217,16 @@ mod producer_internal_tests {
             RecordSet::new()
         }
         
-        async fn send_stream<U>(
+        async fn send_stream(
             &self,
-            records: U,
-        ) -> Map<U, dyn Fn(U) -> dyn Future<Output = Result<ProducerRecord<String, String>, ProducerError>>>
-        where
-            U: Stream + Send,
-            U::Item: Into<ProducerRecord<String, String>>
+            records: RecordStream<ProducerRecord<String, String>>,
+        ) -> Pin<Box<dyn Stream<Item = Result<ProducerRecord<String, String>, ProducerSendError>> + Send +'life0>>
         {
-            let f = |r| async{
-                let record = r;
-                self.send(r.into()).await
+            let f = |r: ProducerRecord<String, String>| {
+                self.send_sync(r.into())
             };
-            records.map(f)
+            let m = records.map(f);
+            m.boxed()
         }
 
         async fn get_partitions_for_topic(
@@ -275,8 +278,6 @@ mod producer_internal_tests {
 
         let producer = SomeProducer::new_transactional();
 
-        let producer_ref = Arc::new(producer);
-
         let rs_records = vec![
             ProducerRecord::<String, String>::from_key_value("one".into(), "SomeData".into())
                 .with_topic("SomeTopic")
@@ -289,20 +290,27 @@ mod producer_internal_tests {
                 .into_record(),
         ];
 
-        let rs_producer = producer_ref.clone();
+        let producer_ref = Arc::new(producer);
         let rs = RecordStream::from(rs_records);
         let rs_channel = rs.get_channel();
 
-        let rs_join_handle = spawn(producer_ref.send_stream(rs).await.for_each_concurrent(usize::MAX, |r| async {
-            match r {
-                Ok(r) => {
-                    info!("Successful Stream Item: {:?}", r);
-                }
-                Err(e) => {
-                    error!("Failed Stream Item: {}", e);
-                }
+        let rs_join_handle = spawn(
+            async move {
+                producer_ref
+                .send_stream(rs)
+                .await
+                .for_each(|r| async {
+                    match r {
+                        Ok(r) => {
+                            info!("Successful Stream Item: {:?}", r);
+                        }
+                        Err(e) => {
+                            error!("Failed Stream Item: {}", e);
+                        }
+                    }
+                }).await;
             }
-        }));
+        );
 
         for n in 0..20 {
             match rs_channel.send(
@@ -310,7 +318,9 @@ mod producer_internal_tests {
                     .with_topic("AnotherTopic")
                     .into_record(),
             ) {
-                Ok(_) => {}
+                Ok(_) => {
+                    info!("Success");
+                }
                 Err(e) => {
                     error!("Error: {}", e);
                 }

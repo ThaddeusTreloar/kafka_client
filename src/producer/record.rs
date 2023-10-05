@@ -13,14 +13,15 @@ use crate::common::{
 pub type RecordMetadata = ();
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ProducerRecord<K, V> {
+pub struct ProducerRecord<K, V> 
+where K: Sized, V: Sized
+{
     headers: Vec<(String, String)>,
     key: Option<K>,
     topic_partition: TopicPartition<OptionalPartition>,
     timestamp: Option<i64>,
     value: Option<V>,
 }
-
 
 impl <K, V> Display for ProducerRecord<K, V>
 where K: Display + Serialize, V: Display + Serialize {
