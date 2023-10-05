@@ -2,7 +2,7 @@ use std::{marker::PhantomData, collections::VecDeque, pin::Pin, task::{Context, 
 
 use async_trait::async_trait;
 use chrono::{offset, DateTime};
-use futures::{Stream, StreamExt};
+use futures::{Stream, StreamExt, TryStream};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::pin::pin;
@@ -52,6 +52,24 @@ pub struct RecordStream<T> {
     waker: Arc<Mutex<Option<Waker>>>,
     //channel_thread: JoinHandle<()>, T
 }
+
+/*impl <T> TryStream for RecordStream<T> {
+    type Ok = T;
+    type Error = error::Error;
+
+    fn try_poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Self::Ok, Self::Error>>> {
+        let mut_ref = self.get_mut();
+        if let Some(item) = mut_ref.pop() {
+            std::task::Poll::Ready(Some(Ok(item)))
+        } else {
+            mut_ref.set_waker(cx.waker());
+            std::task::Poll::Pending
+        }
+    }
+}*/
 
 impl <T> Unpin for RecordStream<T> {}
 
